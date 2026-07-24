@@ -105,7 +105,7 @@ contract Test2to4_Opcodes is Test {
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (order, strategy, tokens, amounts) = builder.buildFacilityLeg(_facilityTerms(lender, FACILITY_USDC));
+        (order, strategy, tokens, amounts) = builder.buildFacilityLeg(_facilityTerms(lender, FACILITY_USDC), borrower);
         vm.prank(lender);
         orderHash = AQUA.ship(address(router), strategy, tokens, amounts);
     }

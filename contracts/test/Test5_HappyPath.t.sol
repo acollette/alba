@@ -11,6 +11,7 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
+import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
 import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
@@ -46,6 +47,8 @@ contract Test5_HappyPath is Test {
 
     ISwapVM.Order facilityOrder;
     bytes32 facilityHash;
+    bytes32 constant FACILITY_ID = bytes32(uint256(0xFAC));
+    uint256 constant COLLATERAL_RATIO_1E18 = 1.3e15; // 1.3e8 collateral per 100_000e6 drawn (130%)
 
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
@@ -70,12 +73,17 @@ contract Test5_HappyPath is Test {
                 pullToken: address(usdc),
                 amount: FACILITY,
                 salt: 1
-            })
+            }),
+            address(escrow)
         );
         vm.prank(lender);
         facilityHash = AQUA.ship(address(router), strategy, tokens, amounts);
+        vm.prank(lender);
+        escrow.registerFacility(
+            FACILITY_ID, facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), COLLATERAL_RATIO_1E18
+        );
 
-        cbbtc.mint(borrower, COLLAT1 + COLLAT2);
+        cbbtc.mint(borrower, 5e8);
         vm.prank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         vm.prank(borrower);
@@ -115,10 +123,8 @@ contract Test5_HappyPath is Test {
         returns (ISwapVM.Order memory maturityOrder, bytes32 maturityHash, uint256 repayment)
     {
         vm.prank(borrower);
-        escrow.lockFor(bytes32(drawId), IERC20(address(cbbtc)), collateral);
-
-        vm.prank(borrower);
-        router.swap(facilityOrder, address(cbbtc), address(usdc), drawAmount, _pullData(borrower, address(0)));
+        uint256 locked = escrow.draw(FACILITY_ID, bytes32(drawId), drawAmount);
+        assertEq(locked, collateral, "pro-rata collateral mismatch");
 
         repayment = builder.repaymentAmount(drawAmount, RATE_BPS, TERM);
         bytes memory strategy;
@@ -164,26 +170,33 @@ contract Test5_HappyPath is Test {
         assertEq(usdc.balanceOf(lender), FACILITY - DRAW1 - DRAW2 + repayment1, "repayment did not land with lender");
 
         // Executor releases draw 1 collateral pro-rata; draw 2 stays locked
+        uint256 collatBefore = cbbtc.balanceOf(borrower);
         vm.prank(executor);
         escrow.release(bytes32(uint256(1)));
 
-        assertEq(cbbtc.balanceOf(borrower), COLLAT1, "draw-1 collateral not returned");
+        assertEq(cbbtc.balanceOf(borrower) - collatBefore, COLLAT1, "draw-1 collateral not returned");
         assertEq(cbbtc.balanceOf(address(escrow)), COLLAT2, "draw-2 collateral must remain locked");
 
         // Facility remains usable: borrower still has 150k of capacity
+        uint256 usdcBefore = usdc.balanceOf(borrower);
         vm.prank(borrower);
-        (, uint256 aOut3,) =
-            router.swap(facilityOrder, address(cbbtc), address(usdc), 150_000e6, _pullData(borrower, address(0)));
-        assertEq(aOut3, 150_000e6, "remaining capacity not drawable");
+        escrow.draw(FACILITY_ID, bytes32(uint256(3)), 150_000e6);
+        assertEq(usdc.balanceOf(borrower) - usdcBefore, 150_000e6, "remaining capacity not drawable");
         assertEq(router.coveredAmount(lender, facilityHash), FACILITY, "facility should now be fully drawn");
     }
 
     function test_Release_OnlyExecutor() public {
         vm.prank(borrower);
-        escrow.lockFor(bytes32(uint256(9)), IERC20(address(cbbtc)), 1e8);
+        escrow.draw(FACILITY_ID, bytes32(uint256(9)), 10_000e6);
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyExecutor.selector, borrower));
         vm.prank(borrower);
         escrow.release(bytes32(uint256(9)));
+    }
+
+    function test_Draw_OnlyViaEscrow_StrangerCannotDrawUncollateralized() public {
+        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.UnauthorizedTaker.selector, borrower, address(escrow)));
+        vm.prank(borrower);
+        router.swap(facilityOrder, address(cbbtc), address(usdc), 1_000e6, _pullData(borrower, address(0)));
     }
 }

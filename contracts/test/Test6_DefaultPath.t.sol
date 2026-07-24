@@ -77,9 +77,13 @@ contract Test6_DefaultPath is Test {
                 pullToken: address(usdc),
                 amount: FACILITY,
                 salt: 1
-            })
+            }),
+            address(escrow)
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
+        escrow.registerFacility(
+            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), 1.3e15
+        );
         vm.stopPrank();
 
         cbbtc.mint(borrower, COLLAT1);
@@ -89,8 +93,7 @@ contract Test6_DefaultPath is Test {
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
-        escrow.lockFor(bytes32(uint256(1)), IERC20(address(cbbtc)), COLLAT1);
-        router.swap(facilityOrder, address(cbbtc), address(usdc), DRAW1, _pullData(borrower));
+        escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: borrower,

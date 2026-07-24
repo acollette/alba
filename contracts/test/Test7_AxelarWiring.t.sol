@@ -86,9 +86,13 @@ contract Test7_AxelarWiring is Test {
                 pullToken: address(usdc),
                 amount: FACILITY,
                 salt: 1
-            })
+            }),
+            address(escrow)
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
+        escrow.registerFacility(
+            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), 1.3e15
+        );
         vm.stopPrank();
 
         // Draw + arm maturity leg + register settlement package with the executor
@@ -100,8 +104,7 @@ contract Test7_AxelarWiring is Test {
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
-        escrow.lockFor(DRAW_ID, IERC20(address(cbbtc)), COLLAT1);
-        router.swap(facilityOrder, address(cbbtc), address(usdc), DRAW1, _pullData(borrower));
+        escrow.draw(bytes32(uint256(0xFAC)), DRAW_ID, DRAW1);
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: borrower,

@@ -56,15 +56,18 @@ contract LiveWiring is Script {
                 pullToken: address(usdc),
                 amount: FACILITY,
                 salt: 1
-            })
+            }),
+            address(escrow)
         );
         aqua.ship(address(router), strategy, tokens, amounts);
+        escrow.registerFacility(
+            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), 1.3e15
+        );
 
-        // Lock collateral and draw 100k (borrower = me)
+        // Atomic collateralized draw: collateral in, cash out, one tx (borrower = me)
         cbbtc.mint(me, COLLAT1);
         cbbtc.approve(address(escrow), type(uint256).max);
-        escrow.lockFor(bytes32(uint256(1)), IERC20(address(cbbtc)), COLLAT1);
-        router.swap(facilityOrder, address(cbbtc), address(usdc), DRAW1, _pullData(me));
+        escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
 
         // Arm the maturity leg + register the settlement package with the executor
         uint40 maturity = uint40(block.timestamp + 420);

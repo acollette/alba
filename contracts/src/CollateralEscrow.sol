@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20, IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
+import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "./TermRouter.sol";
 import {ChronosProgramBuilder} from "./lib/ProgramBuilder.sol";
@@ -28,6 +30,9 @@ contract CollateralEscrow {
     using SafeERC20 for IERC20;
 
     error OnlyExecutor(address caller);
+    error FacilityAlreadyRegistered(bytes32 facilityId);
+    error FacilityUnknown(bytes32 facilityId);
+    error OnlyFacilityLender(address caller, address lender);
     error DrawAlreadyExists(bytes32 drawId);
     error DrawNotLocked(bytes32 drawId);
     error AuctionNotArmed(bytes32 drawId);
@@ -48,6 +53,15 @@ contract CollateralEscrow {
         DrawState state;
     }
 
+    struct Facility {
+        ISwapVM.Order order; // facility leg built with _onlyTaker(this escrow)
+        address lender;
+        IERC20 loanToken;
+        IERC20 collateralToken;
+        uint256 collateralPerLoan1e18; // collateral units per loan unit, 1e18-scaled (130% etc.)
+        bool exists;
+    }
+
     struct Auction {
         bytes32 orderHash;
         address lender;
@@ -56,6 +70,10 @@ contract CollateralEscrow {
         uint256 fee;
     }
 
+    event FacilityRegistered(bytes32 indexed facilityId, address indexed lender, uint256 collateralPerLoan1e18);
+    event Drawn(
+        bytes32 indexed facilityId, bytes32 indexed drawId, address indexed borrower, uint256 amount, uint256 collateral
+    );
     event CollateralLocked(bytes32 indexed drawId, address indexed borrower, address token, uint256 amount);
     event CollateralReleased(bytes32 indexed drawId, address indexed borrower, uint256 amount);
     event AuctionArmed(bytes32 indexed drawId, bytes32 orderHash, uint256 target);
@@ -74,6 +92,7 @@ contract CollateralEscrow {
     ChronosProgramBuilder public immutable BUILDER;
     address public immutable FEE_SINK;
 
+    mapping(bytes32 facilityId => Facility) public facilities;
     mapping(bytes32 drawId => Draw) public draws;
     mapping(bytes32 drawId => Auction) public auctions;
     /// @dev ERC-1271 authorization set: order hashes of currently armed auctions
@@ -96,12 +115,72 @@ contract CollateralEscrow {
         return armedOrders[hash] ? ERC1271_MAGIC : bytes4(0xffffffff);
     }
 
-    /// @notice Lock collateral for a draw; pulls from the caller (the borrower).
-    function lockFor(bytes32 drawId, IERC20 token, uint256 amount) external {
+    /// @notice Lender registers a facility whose draw leg names THIS escrow as sole taker.
+    /// From then on the only way to draw is `draw()` — collateral in, cash out, atomically.
+    function registerFacility(
+        bytes32 facilityId,
+        ISwapVM.Order calldata order,
+        IERC20 loanToken,
+        IERC20 collateralToken,
+        uint256 collateralPerLoan1e18
+    ) external {
+        require(!facilities[facilityId].exists, FacilityAlreadyRegistered(facilityId));
+        require(msg.sender == order.maker, OnlyFacilityLender(msg.sender, order.maker));
+        facilities[facilityId] = Facility({
+            order: order,
+            lender: msg.sender,
+            loanToken: loanToken,
+            collateralToken: collateralToken,
+            collateralPerLoan1e18: collateralPerLoan1e18,
+            exists: true
+        });
+        emit FacilityRegistered(facilityId, msg.sender, collateralPerLoan1e18);
+    }
+
+    /// @notice THE draw: pulls pro-rata collateral from the caller and executes the facility
+    /// pull in the same transaction, loan proceeds straight to the borrower. It is
+    /// structurally impossible to hold drawn funds without the matching collateral locked —
+    /// the facility leg's `_onlyTaker` rejects every other taker.
+    /// @dev Collateral only locks per-draw: publishing/undrawn capacity costs the borrower nothing.
+    function draw(bytes32 facilityId, bytes32 drawId, uint256 amount) external returns (uint256 collateral) {
+        Facility storage f = facilities[facilityId];
+        require(f.exists, FacilityUnknown(facilityId));
         require(draws[drawId].state == DrawState.NONE, DrawAlreadyExists(drawId));
-        draws[drawId] = Draw({borrower: msg.sender, token: token, amount: amount, state: DrawState.LOCKED});
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        emit CollateralLocked(drawId, msg.sender, address(token), amount);
+
+        collateral = Math.ceilDiv(amount * f.collateralPerLoan1e18, 1e18);
+        draws[drawId] =
+            Draw({borrower: msg.sender, token: f.collateralToken, amount: collateral, state: DrawState.LOCKED});
+        f.collateralToken.safeTransferFrom(msg.sender, address(this), collateral);
+        emit CollateralLocked(drawId, msg.sender, address(f.collateralToken), collateral);
+
+        ROUTER.swap(f.order, address(f.collateralToken), address(f.loanToken), amount, _drawTakerData(msg.sender));
+        emit Drawn(facilityId, drawId, msg.sender, amount, collateral);
+    }
+
+    function _drawTakerData(address borrower) private view returns (bytes memory) {
+        return TakerTraitsLib.build(
+            TakerTraitsLib.Args({
+                taker: address(this),
+                isExactIn: false, // exact-out: amount = loan tokens drawn
+                shouldUnwrapWeth: false,
+                isStrictThresholdAmount: false,
+                isFirstTransferFromTaker: false,
+                useTransferFromAndAquaPush: false,
+                threshold: "",
+                to: borrower, // proceeds land with the borrower, not the escrow
+                deadline: 0,
+                hasPreTransferInCallback: false,
+                hasPreTransferOutCallback: false,
+                preTransferInHookData: "",
+                postTransferInHookData: "",
+                preTransferOutHookData: "",
+                postTransferOutHookData: "",
+                preTransferInCallbackData: "",
+                preTransferOutCallbackData: "",
+                instructionsArgs: "",
+                signature: ""
+            })
+        );
     }
 
     /// @notice Return collateral to the borrower after a successful repayment settlement.

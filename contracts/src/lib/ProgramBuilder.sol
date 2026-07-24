@@ -44,7 +44,10 @@ abstract contract ChronosProgramBuilder is ChronosInstructionSet {
 
     /// @notice Facility open/draw leg: each draw is a zero-in exact-out partial fill of the
     /// committed pullToken; `_stopWhenCovered` caps cumulative draws at the facility size.
-    function buildFacilityLeg(PullLegTerms memory t)
+    /// `_onlyTaker(taker)` makes the escrow the ONLY doorway to the facility: collateral in
+    /// and cash out are one atomic motion via `CollateralEscrow.draw` (quotes stay open —
+    /// the check skips in static context).
+    function buildFacilityLeg(PullLegTerms memory t, address taker)
         public
         pure
         returns (
@@ -56,6 +59,7 @@ abstract contract ChronosProgramBuilder is ChronosInstructionSet {
     {
         Program memory p = ProgramBuilder.init(_chronosInstructions());
         bytes memory bytecode = bytes.concat(
+            p.build(_onlyTaker, OnlyTakerArgsBuilder.build(taker)),
             p.build(_salt, abi.encodePacked(t.salt)),
             p.build(_stopWhenCovered, StopWhenCoveredArgsBuilder.build(false, t.amount))
         );
