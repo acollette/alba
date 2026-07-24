@@ -8,6 +8,7 @@ import {TokenMock} from "@1inch/solidity-utils/contracts/mocks/TokenMock.sol";
 import {IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
+import {SwapVM} from "swap-vm/src/SwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
@@ -219,6 +220,16 @@ contract Test6_DefaultPath is Test {
         assertEq(cbbtc.balanceOf(borrower), COLLAT1 - c1 - c2, "surplus collateral not returned");
         assertEq(cbbtc.balanceOf(address(escrow)), 0, "escrow must hold no collateral after sweep");
         assertEq(cbbtc.allowance(address(escrow), address(router)), 0, "auction path must be closed");
+
+        // Disarm is explicit: the ERC-1271 flag is cleared, so any fill after sweep dies at
+        // the signature layer (checked before the program even runs) — no stale fillable order
+        assertFalse(escrow.armedOrders(auctionHash), "armed flag must be cleared after sweep");
+        usdc.mint(filler2, 1e6);
+        vm.prank(filler2);
+        usdc.approve(address(router), 1e6);
+        vm.expectRevert(abi.encodeWithSelector(SwapVM.BadSignature.selector, address(escrow), auctionHash, bytes("")));
+        vm.prank(filler2);
+        router.swap(auctionOrder, address(usdc), address(cbbtc), 1e6, _fillData(filler2));
     }
 
     function test_ArmAuction_OnlyExecutor_AndOnlyOnce() public {
