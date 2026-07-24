@@ -32,8 +32,11 @@
 
 ### Item 2 — Hedera scheduled tx → Axelar GMP → Base Sepolia receiver 🔨 IN PROGRESS
 
-- [ ] Foundry scaffold + spike contracts (sender on Hedera, dumb receiver on Base Sepolia)
-- [ ] Wallets funded (Hedera testnet HBAR + Base Sepolia ETH)
+- [x] Foundry scaffold + spike contracts compile (`ChronosTriggerSpike` w/ HSS `scheduleCall`,
+      `SpikeReceiver` extends `AxelarExecutable`); runbook in `contracts/script/spike-runbook.sh`
+- [ ] **BLOCKED ON HUMAN: fund deployer `0xA2a0423aB76D9AA97d466D19D1A58F11973aDe3D`**
+      — Hedera testnet HBAR (faucet.hedera.com) + Base Sepolia ETH (any faucet).
+      Faucets are captcha-gated; key is throwaway, lives in `contracts/.env` (gitignored).
 - [ ] Manual `dispatch()` → message executes on Base Sepolia
 - [ ] Scheduled dispatch via HSS (`0x16b`) → fires without any keeper
 - **HOUR-5 GATE:** if not firing → fallback per PLAN.md (manual relay, honest narration)
