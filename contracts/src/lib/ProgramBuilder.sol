@@ -6,6 +6,8 @@ import {Context} from "swap-vm/src/libs/VM.sol";
 import {MakerTraitsLib} from "swap-vm/src/libs/MakerTraits.sol";
 import {Opcodes} from "swap-vm/src/opcodes/Opcodes.sol";
 import {LimitSwapArgsBuilder} from "swap-vm/src/instructions/LimitSwap.sol";
+import {DutchAuctionArgsBuilder} from "swap-vm/src/instructions/DutchAuction.sol";
+import {BalancesArgsBuilder} from "swap-vm/src/instructions/Balances.sol";
 import {Program, ProgramBuilder} from "swap-vm/test/utils/ProgramBuilder.sol";
 
 import {
@@ -124,6 +126,56 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
         amounts[1] = makerTokenBalance;
     }
 
+    /// @param maker The escrow (auction Aqua maker)
+    /// @param bidToken Filler's tokenIn (loan token, USDC); raised amount counts toward target
+    /// @param collateralToken tokenOut sold to fillers (cbBTC)
+    /// @param collateralAmount Collateral shipped for sale (this draw's lock only)
+    /// @param startBidRef Bid-side reference balance: collateralAmount × startPrice. Price per
+    ///        collateral unit starts at startBidRef/collateralAmount and decays exponentially.
+    /// @param target USDC to raise (debt + liquidation fee) — auction halts here
+    /// @param startTime Decay clock start; execution before startTime reverts (underflow gate)
+    /// @param duration Auction lifetime in seconds (max 65535); expiry = price floor
+    /// @param decayFactor Per-second decay ×1e18 (e.g. 0.99994e18); floor = start·decay^duration
+    struct AuctionTerms {
+        address maker;
+        address bidToken;
+        address collateralToken;
+        uint256 collateralAmount;
+        uint256 startBidRef;
+        uint256 target;
+        uint40 startTime;
+        uint16 duration;
+        uint64 decayFactor;
+        uint256 salt;
+    }
+
+    /// @notice Dutch-auction liquidation leg: unit price decays from startBidRef/collateral
+    /// toward the floor (reached at expiry); `_stopWhenCovered` halts sales the moment
+    /// `target` USDC is raised. Partial fills welcome — every SwapVM filler is a liquidator.
+    ///
+    /// @dev SIGNATURE mode (ERC-1271 by the escrow), NOT Aqua mode: Aqua fillers must push
+    /// tokenIn into the strategy, which inflates the bid-side pricing balance and breaks the
+    /// decay curve after the first partial fill. `_staticBalancesXD` re-seeds pricing from
+    /// program bytes on every fill, so the price is purely time-decayed. Collateral custody
+    /// stays capped by the escrow's bounded router allowance.
+    function buildAuctionLeg(AuctionTerms memory t) public pure returns (ISwapVM.Order memory order) {
+        Program memory p = ProgramBuilder.init(_instructions());
+        address[] memory tokens = new address[](2);
+        uint256[] memory balances = new uint256[](2);
+        tokens[0] = t.bidToken;
+        tokens[1] = t.collateralToken;
+        balances[0] = t.startBidRef;
+        balances[1] = t.collateralAmount;
+        bytes memory bytecode = bytes.concat(
+            p.build(_salt, abi.encodePacked(t.salt)),
+            p.build(_staticBalancesXD, BalancesArgsBuilder.build(tokens, balances)),
+            p.build(_dutchAuctionBalanceIn1D, DutchAuctionArgsBuilder.build(t.startTime, t.duration, t.decayFactor)),
+            p.build(_limitSwap1D, LimitSwapArgsBuilder.build(t.bidToken, t.collateralToken)),
+            p.build(_stopWhenCovered, StopWhenCoveredArgsBuilder.build(true, t.target))
+        );
+        (order,) = _wrapOrder(t.maker, bytecode, false, false);
+    }
+
     /// @notice Zero-coupon repayment for a draw: principal × (1 + rateBps · term / 365d)
     /// @param rateBps annual simple-interest rate in basis points (e.g. 820 = 8.20%)
     function repaymentAmount(uint256 principal, uint256 rateBps, uint256 termSeconds) public pure returns (uint256) {
@@ -135,12 +187,20 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
         pure
         returns (ISwapVM.Order memory order, bytes memory shipStrategy)
     {
+        return _wrapOrder(maker, bytecode, allowZeroAmountIn, true);
+    }
+
+    function _wrapOrder(address maker, bytes memory bytecode, bool allowZeroAmountIn, bool useAqua)
+        internal
+        pure
+        returns (ISwapVM.Order memory order, bytes memory shipStrategy)
+    {
         order = MakerTraitsLib.build(
             MakerTraitsLib.Args({
                 maker: maker,
                 receiver: address(0),
                 shouldUnwrapWeth: false,
-                useAquaInsteadOfSignature: true,
+                useAquaInsteadOfSignature: useAqua,
                 allowZeroAmountIn: allowZeroAmountIn,
                 hasPreTransferInHook: false,
                 hasPostTransferInHook: false,

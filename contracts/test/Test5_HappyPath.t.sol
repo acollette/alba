@@ -48,7 +48,7 @@ contract Test5_HappyPath is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        escrow = new CollateralEscrow(executor);
+        escrow = new CollateralEscrow(executor, router, makeAddr("feeSink"));
         usdc = new TokenMock("Mock USDC", "USDC");
         cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
 
