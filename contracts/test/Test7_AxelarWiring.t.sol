@@ -38,7 +38,7 @@ contract Test7_AxelarWiring is Test {
     uint256 constant RATE_BPS = 820;
     uint256 constant TERM = 90 days;
     uint256 constant DRAW1 = 100_000e6;
-    uint256 constant COLLAT1 = 1.5e8;
+    uint256 constant COLLAT1 = 1.3e8;
 
     string constant SOURCE_CHAIN = "hedera";
     string constant SOURCE_ADDR = "0xDEA1Re915";
@@ -96,17 +96,23 @@ contract Test7_AxelarWiring is Test {
         escrow.registerFacility(
             bytes32(uint256(0xFAC)),
             facilityOrder,
-            borrower,
-            IERC20(address(usdc)),
-            IERC20(address(cbbtc)),
-            oracle,
-            15_000
+            CollateralEscrow.FacilityParams({
+                borrower: borrower,
+                loanToken: IERC20(address(usdc)),
+                collateralToken: IERC20(address(cbbtc)),
+                oracle: oracle,
+                collateralRatioBps: 13_000,
+                maintenanceRatioBps: 11_500,
+                rateBps: RATE_BPS,
+                termSeconds: uint40(TERM),
+                auctionDuration: 3600,
+                auctionDecay: 0.99994e18
+            })
         );
         vm.stopPrank();
 
         // Draw + arm maturity leg + register settlement package with the executor
         cbbtc.mint(borrower, COLLAT1);
-        maturity = uint40(block.timestamp + TERM);
         repayment = builder.repaymentAmount(DRAW1, RATE_BPS, TERM);
         usdc.mint(borrower, repayment - DRAW1); // interest portion; principal comes from the draw
 
@@ -114,6 +120,9 @@ contract Test7_AxelarWiring is Test {
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
         escrow.draw(bytes32(uint256(0xFAC)), DRAW_ID, DRAW1);
+        vm.stopPrank();
+        (,,,,,,, maturity,) = escrow.draws(DRAW_ID);
+        vm.startPrank(borrower);
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             AlbaProgramBuilder.PullLegTerms({
                 maker: borrower,
@@ -126,9 +135,7 @@ contract Test7_AxelarWiring is Test {
             address(executor)
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
-        executor.registerSettlement(
-            DRAW_ID, maturityOrder, address(cbbtc), address(usdc), repayment, lender, 3600, 0.99994e18
-        );
+        executor.registerSettlement(DRAW_ID, maturityOrder, address(cbbtc), address(usdc));
         vm.stopPrank();
     }
 
@@ -158,13 +165,13 @@ contract Test7_AxelarWiring is Test {
         );
     }
 
-    function _payload() internal pure returns (bytes memory) {
-        return abi.encode(uint256(1), uint256(uint256(DRAW_ID)), uint256(0), "SETTLE");
+    function _payload(string memory action) internal pure returns (bytes memory) {
+        return abi.encode(uint256(1), uint256(uint256(DRAW_ID)), uint256(0), action);
     }
 
     function test_GMPMessage_SettlesRepayment_ReleasesCollateral() public {
         vm.warp(maturity);
-        executor.execute(bytes32("cmd1"), SOURCE_CHAIN, SOURCE_ADDR, _payload());
+        executor.execute(bytes32("cmd1"), SOURCE_CHAIN, SOURCE_ADDR, _payload("SETTLE"));
 
         assertEq(usdc.balanceOf(lender), FACILITY - DRAW1 + repayment, "repayment did not reach lender");
         assertEq(cbbtc.balanceOf(borrower), COLLAT1, "collateral not released");
@@ -179,11 +186,10 @@ contract Test7_AxelarWiring is Test {
 
         vm.warp(maturity);
         oracle.setAnswer(100_000e8); // fresh mark post-warp (staleness guard is live)
-        executor.execute(bytes32("cmd2"), SOURCE_CHAIN, SOURCE_ADDR, _payload());
+        executor.execute(bytes32("cmd2"), SOURCE_CHAIN, SOURCE_ADDR, _payload("SETTLE"));
 
         // Settlement failed → auction armed in the same tx; collateral still in escrow
-        (,,,, CollateralEscrow.DrawState state) = _draw(DRAW_ID);
-        assertEq(uint8(state), uint8(CollateralEscrow.DrawState.AUCTIONING), "auction not armed");
+        assertEq(uint8(_drawState(DRAW_ID)), uint8(CollateralEscrow.DrawState.AUCTIONING), "auction not armed");
         assertEq(cbbtc.balanceOf(address(escrow)), COLLAT1, "collateral must remain in escrow");
         assertEq(usdc.balanceOf(lender), FACILITY - DRAW1, "no repayment should have moved");
     }
@@ -193,23 +199,38 @@ contract Test7_AxelarWiring is Test {
         vm.expectRevert(
             abi.encodeWithSelector(AxelarSettlementExecutor.InvalidSource.selector, "ethereum", SOURCE_ADDR)
         );
-        executor.execute(bytes32("cmd3"), "ethereum", SOURCE_ADDR, _payload());
+        executor.execute(bytes32("cmd3"), "ethereum", SOURCE_ADDR, _payload("SETTLE"));
     }
 
     function test_RegisterSettlement_OnlyMaker() public {
         vm.expectRevert(abi.encodeWithSelector(AxelarSettlementExecutor.OnlyOrderMaker.selector, lender, borrower));
         vm.prank(lender);
-        executor.registerSettlement(
-            bytes32(uint256(2)), maturityOrder, address(cbbtc), address(usdc), repayment, lender, 1, 1
-        );
+        executor.registerSettlement(bytes32(uint256(2)), maturityOrder, address(cbbtc), address(usdc));
     }
 
-    function _draw(bytes32 drawId)
-        internal
-        view
-        returns (address borrower_, IERC20 token, uint256 amount, uint256 unused, CollateralEscrow.DrawState state)
-    {
-        (, borrower_, token, amount, state) = escrow.draws(drawId);
-        unused = 0;
+    function test_SentinelCheck_HealthyNoOp_ThenCrashCures() public {
+        // Borrower opts into cures
+        vm.startPrank(borrower);
+        (, bytes memory cStrategy, address[] memory cTokens, uint256[] memory cAmounts) = escrow.cureOrder(DRAW_ID);
+        AQUA.ship(address(router), cStrategy, cTokens, cAmounts);
+        vm.stopPrank();
+
+        // Healthy tick: no intervention
+        vm.expectEmit(true, false, false, true);
+        emit AxelarSettlementExecutor.HealthChecked(DRAW_ID, false);
+        executor.execute(bytes32("chk1"), SOURCE_CHAIN, SOURCE_ADDR, _payload("CHECK"));
+
+        // Crash: the SAME scheduled message kind now cures the position, zero penalty
+        oracle.setAnswer(80_000e8);
+        uint256 lenderBefore = usdc.balanceOf(lender);
+        executor.execute(bytes32("chk2"), SOURCE_CHAIN, SOURCE_ADDR, _payload("CHECK"));
+
+        assertEq(uint8(escrow.stateOf(DRAW_ID)), uint8(CollateralEscrow.DrawState.RELEASED), "cure should close draw");
+        assertGe(usdc.balanceOf(lender) - lenderBefore, DRAW1, "lender repaid by the cure");
+        assertEq(cbbtc.balanceOf(borrower), COLLAT1, "collateral home");
+    }
+
+    function _drawState(bytes32 drawId) internal view returns (CollateralEscrow.DrawState) {
+        return escrow.stateOf(drawId);
     }
 }

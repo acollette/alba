@@ -66,7 +66,20 @@ contract LiveWiring is Script {
         );
         aqua.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, me, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 15_000
+            bytes32(uint256(0xFAC)),
+            facilityOrder,
+            CollateralEscrow.FacilityParams({
+                borrower: me,
+                loanToken: IERC20(address(usdc)),
+                collateralToken: IERC20(address(cbbtc)),
+                oracle: oracle,
+                collateralRatioBps: 13_000,
+                maintenanceRatioBps: 11_500,
+                rateBps: RATE_BPS,
+                termSeconds: 420, // short live tenor so the settlement demo fits a coffee break
+                auctionDuration: 3600,
+                auctionDecay: 0.99994e18
+            })
         );
 
         // Atomic collateralized draw: collateral in, cash out, one tx (borrower = me)
@@ -74,9 +87,13 @@ contract LiveWiring is Script {
         cbbtc.approve(address(escrow), type(uint256).max);
         escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
 
-        // Arm the maturity leg + register the settlement package with the executor
-        uint40 maturity = uint40(block.timestamp + 420);
-        uint256 repayment = builder.repaymentAmount(DRAW1, RATE_BPS, 90 days);
+        // Ship the CURE leg (opt-in, no-penalty liquidation tier) + the maturity leg
+        (, bytes memory cStrategy, address[] memory cTokens, uint256[] memory cAmounts) =
+            escrow.cureOrder(bytes32(uint256(1)));
+        aqua.ship(address(router), cStrategy, cTokens, cAmounts);
+
+        (,,,,,,, uint40 maturity,) = escrow.draws(bytes32(uint256(1)));
+        uint256 repayment = escrow.repaymentOf(bytes32(uint256(1)));
         (
             ISwapVM.Order memory maturityOrder,
             bytes memory mStrategy,
@@ -94,9 +111,7 @@ contract LiveWiring is Script {
             address(executor)
         );
         aqua.ship(address(router), mStrategy, mTokens, mAmounts);
-        executor.registerSettlement(
-            bytes32(uint256(1)), maturityOrder, address(cbbtc), address(usdc), repayment, me, 3600, 0.99994e18
-        );
+        executor.registerSettlement(bytes32(uint256(1)), maturityOrder, address(cbbtc), address(usdc));
 
         vm.stopBroadcast();
 

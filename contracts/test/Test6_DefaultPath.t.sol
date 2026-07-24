@@ -31,7 +31,7 @@ contract Test6_DefaultPath is Test {
     uint256 constant TERM = 90 days;
 
     uint256 constant DRAW1 = 100_000e6;
-    uint256 constant COLLAT1 = 1.5e8; // 150% at 100k USDC per unit
+    uint256 constant COLLAT1 = 1.3e8; // 130% initial at 100k USDC per unit
 
     // Auction params: start 105% of oracle (computed at arm time), floor ~85% at expiry
     uint16 constant DURATION = 3600;
@@ -86,22 +86,31 @@ contract Test6_DefaultPath is Test {
         escrow.registerFacility(
             bytes32(uint256(0xFAC)),
             facilityOrder,
-            borrower,
-            IERC20(address(usdc)),
-            IERC20(address(cbbtc)),
-            oracle,
-            15_000
+            CollateralEscrow.FacilityParams({
+                borrower: borrower,
+                loanToken: IERC20(address(usdc)),
+                collateralToken: IERC20(address(cbbtc)),
+                oracle: oracle,
+                collateralRatioBps: 13_000,
+                maintenanceRatioBps: 11_500,
+                rateBps: RATE_BPS,
+                termSeconds: uint40(TERM),
+                auctionDuration: DURATION,
+                auctionDecay: DECAY
+            })
         );
         vm.stopPrank();
 
         cbbtc.mint(borrower, COLLAT1);
-        maturity = uint40(block.timestamp + TERM);
         repayment = builder.repaymentAmount(DRAW1, RATE_BPS, TERM);
 
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
         escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
+        vm.stopPrank();
+        (,,,,,,, maturity,) = escrow.draws(bytes32(uint256(1)));
+        vm.startPrank(borrower);
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             AlbaProgramBuilder.PullLegTerms({
                 maker: borrower,
@@ -180,7 +189,7 @@ contract Test6_DefaultPath is Test {
         router.swap(maturityOrder, address(cbbtc), address(usdc), repayment, _pullData(executor));
 
         vm.prank(executor);
-        bytes32 auctionHash = escrow.armAuction(drawId, repayment, DURATION, DECAY);
+        bytes32 auctionHash = escrow.armAuction(drawId);
 
         uint256 fee = (repayment * escrow.LIQ_FEE_BPS()) / 10_000;
         uint256 target = repayment + fee;
@@ -192,7 +201,7 @@ contract Test6_DefaultPath is Test {
                 bidToken: address(usdc),
                 collateralToken: address(cbbtc),
                 collateralAmount: COLLAT1,
-                startBidRef: 157_500e6, // 1.5 cbBTC x 105% x 100k oracle, marked at arm time
+                startBidRef: 136_500e6, // 1.3 cbBTC x 105% x 100k oracle, marked at arm time
                 target: target,
                 startTime: uint40(block.timestamp),
                 duration: DURATION,
@@ -251,15 +260,15 @@ contract Test6_DefaultPath is Test {
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyExecutor.selector, borrower));
         vm.prank(borrower);
-        escrow.armAuction(drawId, repayment, DURATION, DECAY);
+        escrow.armAuction(drawId);
 
         vm.prank(executor);
-        escrow.armAuction(drawId, repayment, DURATION, DECAY);
+        escrow.armAuction(drawId);
 
         // Second arm (or release) on the same draw must fail — single-claim collateral
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.DrawNotLocked.selector, drawId));
         vm.prank(executor);
-        escrow.armAuction(drawId, repayment, DURATION, DECAY);
+        escrow.armAuction(drawId);
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.DrawNotLocked.selector, drawId));
         vm.prank(executor);

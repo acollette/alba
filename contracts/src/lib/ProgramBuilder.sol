@@ -67,6 +67,23 @@ abstract contract AlbaProgramBuilder is AlbaInstructionSet {
         (tokens, amounts) = _shipArrays(t);
     }
 
+    /// @notice Cure leg (per draw, opt-in): zero-in pull rights over the borrower's loan-token
+    /// balance with NO maturity gate — the liquidation path's gentle tier. Gated by
+    /// `_onlyTaker(escrow)` (the escrow only pulls on an oracle-verified breach) and capped
+    /// at the full repayment by `_stopWhenCovered`. Identical program shape to the facility leg.
+    function buildCureLeg(PullLegTerms memory t, address taker)
+        public
+        pure
+        returns (
+            ISwapVM.Order memory order,
+            bytes memory shipStrategy,
+            address[] memory tokens,
+            uint256[] memory amounts
+        )
+    {
+        return buildFacilityLeg(t, taker);
+    }
+
     /// @notice Maturity leg (per draw): zero-in pull of the repayment from the borrower's
     /// Aqua balance, gated by maturity time and the settlement executor. `_stopWhenCovered`
     /// doubles as double-settlement protection (a second pull hits OrderCovered).

@@ -19,6 +19,8 @@ contract AlbaTriggerSpike {
 
     event Dispatched(uint256 indexed facilityId, uint256 indexed drawId, string action, uint256 gasPaid);
     event DispatchScheduled(address scheduleAddress, uint256 expirySecond);
+    event RescheduleSkipped(int64 code);
+    event SentinelStopped(uint256 indexed drawId);
     event DispatcherSet(address indexed dispatcher, bool allowed);
     event MaxAxelarGasSet(uint256 maxAxelarGasTinybars);
 
@@ -78,7 +80,7 @@ contract AlbaTriggerSpike {
     /// own balance and forwarded to the gas service (native-token gas payment). Restricted to
     /// authorized dispatchers and capped at `maxAxelarGasTinybars` so a stray call cannot drain
     /// the gas budget.
-    function dispatch(uint256 facilityId, uint256 drawId, string calldata action, uint256 axelarGasTinybars) public {
+    function dispatch(uint256 facilityId, uint256 drawId, string memory action, uint256 axelarGasTinybars) public {
         require(isDispatcher[msg.sender], NotDispatcher(msg.sender));
         require(axelarGasTinybars <= maxAxelarGasTinybars, GasCapExceeded(axelarGasTinybars, maxAxelarGasTinybars));
         // Payload shape per ARCHITECTURE.md: (facilityId, drawId, epoch, action); epoch 0 for single-shot
@@ -96,7 +98,7 @@ contract AlbaTriggerSpike {
     function scheduleDispatch(
         uint256 facilityId,
         uint256 drawId,
-        string calldata action,
+        string memory action,
         uint256 expirySecond,
         uint256 scheduleGasLimit,
         uint256 axelarGasTinybars
@@ -107,6 +109,45 @@ contract AlbaTriggerSpike {
         if (code != HSS_SUCCESS) revert ScheduleFailed(code);
         emit DispatchScheduled(addr, expirySecond);
         return addr;
+    }
+
+    /// @notice Per-draw sentinel kill switch (owner): a fired schedule for a stopped draw
+    /// becomes a no-op instead of dispatching, ending the recurrence.
+    mapping(uint256 drawId => bool stopped) public sentinelStopped;
+
+    function stopSentinel(uint256 drawId) external onlyOwner {
+        sentinelStopped[drawId] = true;
+        emit SentinelStopped(drawId);
+    }
+
+    /// @notice THE SENTINEL: dispatch a CHECK now AND schedule the next one — each network
+    /// execution re-arms itself (HIP-1215 schedules are one-shot; recurrence is the contract
+    /// re-scheduling a call to itself). Runs until `stopSentinel`, HBAR exhaustion, or a
+    /// capacity miss — every tick is a keeper-free, network-executed health check.
+    function sentinelTick(
+        uint256 facilityId,
+        uint256 drawId,
+        uint256 intervalSeconds,
+        uint256 scheduleGasLimit,
+        uint256 axelarGasTinybars
+    ) public {
+        require(isDispatcher[msg.sender], NotDispatcher(msg.sender));
+        if (sentinelStopped[drawId]) return;
+
+        dispatch(facilityId, drawId, "CHECK", axelarGasTinybars);
+
+        bytes memory callData = abi.encodeCall(
+            this.sentinelTick, (facilityId, drawId, intervalSeconds, scheduleGasLimit, axelarGasTinybars)
+        );
+        (int64 code, address addr) = IHederaScheduleService(HSS_ADDRESS).scheduleCall(
+            address(this), block.timestamp + intervalSeconds, scheduleGasLimit, 0, callData
+        );
+        // A failed reschedule must not revert the CHECK that already went out
+        if (code == HSS_SUCCESS) {
+            emit DispatchScheduled(addr, block.timestamp + intervalSeconds);
+        } else {
+            emit RescheduleSkipped(code);
+        }
     }
 
     function hasCapacity(uint256 expirySecond, uint256 gasLimit) external view returns (bool) {

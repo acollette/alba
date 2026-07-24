@@ -32,9 +32,10 @@ contract Test5_HappyPath is Test {
 
     uint256 constant DRAW1 = 100_000e6;
     uint256 constant DRAW2 = 50_000e6;
-    // 150% collateralization at 100k USDC per cbBTC-mock unit price
-    uint256 constant COLLAT1 = 1.5e8;
-    uint256 constant COLLAT2 = 0.75e8;
+    // 130% initial collateralization at 100k USDC per cbBTC-mock unit price
+    // (continuous margining pays for the tighter ratio — maintenance at 115%)
+    uint256 constant COLLAT1 = 1.3e8;
+    uint256 constant COLLAT2 = 0.65e8;
 
     TermRouter router;
     AlbaOrderBuilder builder;
@@ -50,7 +51,8 @@ contract Test5_HappyPath is Test {
     ISwapVM.Order facilityOrder;
     bytes32 facilityHash;
     bytes32 constant FACILITY_ID = bytes32(uint256(0xFAC));
-    uint256 constant COLLATERAL_RATIO_BPS = 15_000; // 150%, marked to oracle at draw time (model-sized, docs/PRICING.md)
+    uint256 constant COLLATERAL_RATIO_BPS = 13_000; // 130% initial, marked to oracle at draw time
+    uint256 constant MAINTENANCE_RATIO_BPS = 11_500; // 115% continuous-margining threshold
 
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
@@ -85,11 +87,18 @@ contract Test5_HappyPath is Test {
         escrow.registerFacility(
             FACILITY_ID,
             facilityOrder,
-            borrower,
-            IERC20(address(usdc)),
-            IERC20(address(cbbtc)),
-            oracle,
-            COLLATERAL_RATIO_BPS
+            CollateralEscrow.FacilityParams({
+                borrower: borrower,
+                loanToken: IERC20(address(usdc)),
+                collateralToken: IERC20(address(cbbtc)),
+                oracle: oracle,
+                collateralRatioBps: COLLATERAL_RATIO_BPS,
+                maintenanceRatioBps: MAINTENANCE_RATIO_BPS,
+                rateBps: RATE_BPS,
+                termSeconds: uint40(TERM),
+                auctionDuration: 3600,
+                auctionDecay: 0.99994e18
+            })
         );
 
         cbbtc.mint(borrower, 5e8);
@@ -127,13 +136,14 @@ contract Test5_HappyPath is Test {
 
     /// @dev One draw: lock collateral → draw USDC from the standing facility order →
     /// arm the maturity leg (borrower ships repayment pull-rights; no funds move)
-    function _draw(uint256 drawId, uint256 drawAmount, uint256 collateral, uint40 maturity)
+    function _draw(uint256 drawId, uint256 drawAmount, uint256 collateral)
         internal
-        returns (ISwapVM.Order memory maturityOrder, bytes32 maturityHash, uint256 repayment)
+        returns (ISwapVM.Order memory maturityOrder, uint40 maturity, uint256 repayment)
     {
         vm.prank(borrower);
         uint256 locked = escrow.draw(FACILITY_ID, bytes32(drawId), drawAmount);
         assertEq(locked, collateral, "pro-rata collateral mismatch");
+        (,,,,,,, maturity,) = escrow.draws(bytes32(drawId)); // maturity set by the escrow (facility term)
 
         repayment = builder.repaymentAmount(drawAmount, RATE_BPS, TERM);
         bytes memory strategy;
@@ -151,15 +161,14 @@ contract Test5_HappyPath is Test {
             executor
         );
         vm.prank(borrower);
-        maturityHash = AQUA.ship(address(router), strategy, tokens, amounts);
+        AQUA.ship(address(router), strategy, tokens, amounts);
     }
 
     function test_FullHappyPath() public {
-        uint40 maturity1 = uint40(block.timestamp + TERM);
-
         // Two draws = the revolver exists
-        (ISwapVM.Order memory maturity1Order,, uint256 repayment1) = _draw(1, DRAW1, COLLAT1, maturity1);
-        _draw(2, DRAW2, COLLAT2, uint40(block.timestamp + 1 hours + TERM));
+        (ISwapVM.Order memory maturity1Order, uint40 maturity1, uint256 repayment1) = _draw(1, DRAW1, COLLAT1);
+        _draw(2, DRAW2, COLLAT2);
+        assertEq(maturity1, uint40(block.timestamp + TERM), "maturity derives from the facility term");
 
         assertEq(usdc.balanceOf(borrower), DRAW1 + DRAW2, "borrower did not receive both draws");
         assertEq(router.coveredAmount(lender, facilityHash), DRAW1 + DRAW2, "facility accounting wrong");
