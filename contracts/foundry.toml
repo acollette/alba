@@ -2,14 +2,22 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-solc_version = "0.8.26"
-# Paris keeps deploys safe on Hedera's EVM (no PUSH0/Cancun surprises)
-evm_version = "paris"
+solc_version = "0.8.30"
+optimizer = true
+optimizer_runs = 700
+via_ir = true
+# swap-vm's TransientLock needs cancun; Hedera testnet supports shanghai+ (spike contracts unaffected)
+evm_version = "cancun"
 remappings = [
     "axelar-gmp-sdk-solidity/=lib/axelar-gmp-sdk-solidity/",
     "forge-std/=lib/forge-std/src/",
+    "swap-vm/=lib/swap-vm/",
+    "@openzeppelin/contracts/=lib/swap-vm/node_modules/@openzeppelin/contracts/",
+    "@1inch/solidity-utils/=lib/swap-vm/node_modules/@1inch/solidity-utils/",
+    "@1inch/aqua/=lib/swap-vm/node_modules/@1inch/aqua/",
 ]
 
 [rpc_endpoints]
 hedera_testnet = "https://testnet.hashio.io/api"
 base_sepolia = "https://sepolia.base.org"
+base = "https://mainnet.base.org"
