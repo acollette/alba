@@ -83,7 +83,13 @@ contract Test5_HappyPath is Test {
         facilityHash = AQUA.ship(address(router), strategy, tokens, amounts);
         vm.prank(lender);
         escrow.registerFacility(
-            FACILITY_ID, facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, COLLATERAL_RATIO_BPS
+            FACILITY_ID,
+            facilityOrder,
+            borrower,
+            IERC20(address(usdc)),
+            IERC20(address(cbbtc)),
+            oracle,
+            COLLATERAL_RATIO_BPS
         );
 
         cbbtc.mint(borrower, 5e8);
@@ -196,6 +202,17 @@ contract Test5_HappyPath is Test {
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyExecutor.selector, borrower));
         vm.prank(borrower);
         escrow.release(bytes32(uint256(9)));
+    }
+
+    function test_Draw_NamedBorrowerOnly() public {
+        address stranger = makeAddr("stranger");
+        cbbtc.mint(stranger, 5e8);
+        vm.prank(stranger);
+        cbbtc.approve(address(escrow), type(uint256).max);
+
+        vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyFacilityBorrower.selector, stranger, borrower));
+        vm.prank(stranger);
+        escrow.draw(FACILITY_ID, bytes32(uint256(77)), 1_000e6);
     }
 
     function test_Draw_OnlyViaEscrow_StrangerCannotDrawUncollateralized() public {

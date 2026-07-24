@@ -35,6 +35,7 @@ contract CollateralEscrow {
     error FacilityAlreadyRegistered(bytes32 facilityId);
     error FacilityUnknown(bytes32 facilityId);
     error OnlyFacilityLender(address caller, address lender);
+    error OnlyFacilityBorrower(address caller, address borrower);
     error DrawAlreadyExists(bytes32 drawId);
     error DrawNotLocked(bytes32 drawId);
     error AuctionNotArmed(bytes32 drawId);
@@ -61,6 +62,7 @@ contract CollateralEscrow {
     struct Facility {
         ISwapVM.Order order; // facility leg built with _onlyTaker(this escrow)
         address lender;
+        address borrower; // named counterparty; address(0) = open to any collateralized borrower
         IERC20 loanToken;
         IERC20 collateralToken;
         IAggregatorV3 oracle; // collateral/USD feed; loan token assumed USD-stable
@@ -132,6 +134,7 @@ contract CollateralEscrow {
     function registerFacility(
         bytes32 facilityId,
         ISwapVM.Order calldata order,
+        address borrower,
         IERC20 loanToken,
         IERC20 collateralToken,
         IAggregatorV3 oracle,
@@ -142,6 +145,7 @@ contract CollateralEscrow {
         facilities[facilityId] = Facility({
             order: order,
             lender: msg.sender,
+            borrower: borrower,
             loanToken: loanToken,
             collateralToken: collateralToken,
             oracle: oracle,
@@ -181,6 +185,7 @@ contract CollateralEscrow {
     function draw(bytes32 facilityId, bytes32 drawId, uint256 amount) external returns (uint256 collateral) {
         Facility storage f = facilities[facilityId];
         require(f.exists, FacilityUnknown(facilityId));
+        require(f.borrower == address(0) || msg.sender == f.borrower, OnlyFacilityBorrower(msg.sender, f.borrower));
         require(draws[drawId].state == DrawState.NONE, DrawAlreadyExists(drawId));
 
         collateral = collateralForDraw(facilityId, amount);
@@ -251,9 +256,8 @@ contract CollateralEscrow {
         draw.state = DrawState.AUCTIONING;
 
         Facility storage f = facilities[draw.facilityId];
-        uint256 startBidRef = (
-            draw.amount * _freshPrice(f) * AUCTION_START_PREMIUM_BPS * 10 ** f.loanDecimals
-        ) / (10_000 * 10 ** (f.collateralDecimals + f.feedDecimals));
+        uint256 startBidRef = (draw.amount * _freshPrice(f) * AUCTION_START_PREMIUM_BPS * 10 ** f.loanDecimals)
+            / (10_000 * 10 ** (f.collateralDecimals + f.feedDecimals));
 
         uint256 fee = (debt * LIQ_FEE_BPS) / 10_000;
         ISwapVM.Order memory order = BUILDER.buildAuctionLeg(

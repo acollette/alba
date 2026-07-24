@@ -85,7 +85,13 @@ contract Test6_DefaultPath is Test {
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
+            bytes32(uint256(0xFAC)),
+            facilityOrder,
+            borrower,
+            IERC20(address(usdc)),
+            IERC20(address(cbbtc)),
+            oracle,
+            13_000
         );
         vm.stopPrank();
 

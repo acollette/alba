@@ -66,7 +66,7 @@ contract LiveWiring is Script {
         );
         aqua.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
+            bytes32(uint256(0xFAC)), facilityOrder, me, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
         );
 
         // Atomic collateralized draw: collateral in, cash out, one tx (borrower = me)
