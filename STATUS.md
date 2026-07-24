@@ -130,3 +130,21 @@ mention to Hedera judges).
 
 ## Day 2 items (NOT touched, per plan)
 Midnight rates, Graph query, frontend, DealRegistry (thin), position NFT.
+
+## Day 2 — continuous margining upgrade ✅ (suite 37/37)
+
+- **Liquidation is continuous, not maturity-only**: permissionless oracle-verified
+  `liquidate` + Hedera sentinel (`sentinelTick` — self-rescheduling HIP-1215 schedule,
+  each network execution re-arms the next; keeper-free health checks).
+- **Three-tier waterfall, gentlest first**: full cure from the borrower's Aqua-authorized
+  cure leg (early close, ZERO penalty) → partial cure (health restored, draw lives) →
+  Dutch auction only for a drained borrower. Cures reconcile into maturity settlement.
+- Credit terms (rate 4.60%, term, 130% initial / 115% maintenance, auction params) are
+  facility-immutable ON-CHAIN; maturity + repayment derive from them.
+- Pricing simplified: Black–Scholes gap-risk term removed BY CONSTRUCTION (the margin
+  buffer + check frequency replace the option premium); build-up = benchmark + 25bps
+  residual + 50bps liquidity. Model 90d ≈ 4.2%; demo quote 4.60%.
+- Rates layer (earlier today): executable Midnight curve ($25k clip VWAP, depth-filtered,
+  log-DF interpolation, labeled extrapolation), SOFR-style weighted floating composite,
+  live dashboard. Day-2 spikes green (Midnight API + tick math; 4 Base subgraphs).
+- Pending: live redeploy (v4) + live sentinel/cure demo; frontend (facility card+timeline).

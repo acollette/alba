@@ -31,51 +31,44 @@ benchmark is not "min and max of whatever answered":
 - **Volume weighting:** the composite is the borrow-balance-weighted mean of the
   included venues — the same discipline that makes SOFR a volume-weighted statistic
   rather than a survey.
-- Role: display context + plausibility bound for the fixed curve (fixed(T) should sit
-  near expected average floating over T ± term premium). Never a mechanical input.
+- Role: display context + plausibility bound for the fixed curve. Never a mechanical input.
 
 ## 3. The facility rate build-up
 
 ```
-rate(T) = benchmark(T)                      Midnight curve at the draw tenor
-        + gap-risk spread(T, ratio, σ, ρ)   the price of maturity-only margining
-        + liquidity/commitment premium      bespoke, non-fungible, committed capacity
-        + settlement fee                    protocol constant
+rate(T) = benchmark(T)                Midnight curve at the draw tenor
+        + residual risk premium       what continuous margining does NOT remove
+        + liquidity/commitment premium bespoke, non-fungible, committed capacity
+        + settlement fee              protocol constant
 ```
 
-**Gap risk is an option price, not a fudge factor.** With maturity-only margining the
-lender is short a European put on the collateral: for principal P, collateral ratio c,
-repayment K = P(1+rT), auction recovery ρ (fraction of oracle the auction realizes),
-the lender loses iff `ρ·S_T·c/S_0 < K/P`. Expected loss = `ρ · BSput(S0=c, K'=K/ρ, σ, T)`
-per unit principal, annualized into bps. Defaults: **σ = 40%** (cbBTC annualized,
-configurable), **ρ = 0.90** (auction clears between the 105% start and 85% floor).
+**Why there is no option-pricing term.** Alba runs CONTINUOUS margining: health
+(`collateralValue ≥ 115% × accruedDebt`) is checkable by anyone at any time, the
+Hedera sentinel checks it on schedule with no keeper, and a breach runs a
+gentlest-first waterfall — full cure from the borrower's Aqua-authorized funds
+(early close, **zero penalty**) → partial cure (health restored, draw lives) →
+Dutch auction only for a drained borrower. The lender is therefore no longer short
+a European put to maturity; the old Black–Scholes gap-risk term is gone **by
+construction**, not by assumption.
 
-**Sensitivity (90d, σ=40%, ρ=0.90, benchmark ≈ 3.5%):**
+**What replaces the model is a buffer, plus a parameter.** The remaining risk is
+the move that can happen *between* two sentinel checks plus the auction's clearing
+window, and oracle latency. That is absorbed by:
+- the **margin buffer** — initial 130% vs maintenance 115% (the real risk knobs are
+  this width and the check frequency, both facility-immutable), and
+- a small **residual risk premium** (default 25bps, configurable) covering
+  between-checks jumps and auction depth.
 
-| Collateral ratio | Gap risk | Suggested rate |
-|---|---|---|
-| 130% | ~1,440 bps | ~18.4% |
-| 140% | ~650 bps | ~10.4% |
-| **150%** | **~290 bps** | **~6.9%** |
-| 160% | ~130 bps | ~5.3% |
-| 180% | ~26 bps | ~4.2% |
-
-Two consequences we adopt:
-
-1. **Facilities are sized at 150%** (not the earlier 130%): the model prices 130% as
-   uneconomic for the lender at realistic vol. The demo facility quotes **8.20% at
-   150%** — ~130bps over model, which is where real bilateral quotes sit (balance-sheet
-   cost + margin).
-2. The table IS the quantitative case for the roadmap: **continuous margining
-   collapses the gap-risk column** — that's precisely what the Hedera-scheduled
-   sentinel upgrade buys, in bps.
+Current live build-up at 90d (benchmark ≈ 3.5%): benchmark + 25bps residual +
+50bps liquidity ≈ **4.2% model rate**; the demo facility quotes **4.60%** — a
+realistic bilateral margin over model.
 
 ## Parameters (all configurable via /api/quote)
 
 | Param | Default | Note |
 |---|---|---|
-| `volAnnual` | 0.40 | cbBTC annualized vol; swap in a live implied-vol feed in production |
-| `recovery` | 0.90 | auction realization vs oracle (start 105%, floor 85%) |
+| `residualRiskBps` | 25 | between-checks jump + oracle latency + auction depth |
 | `liquidityPremiumBps` | 50 | non-fungible position + committed capacity |
 | `settlementFeeBps` | 0 | protocol constant when enabled |
+| initial / maintenance ratio | 130% / 115% | facility-immutable; the margin buffer |
 | clip / depth floor / venue floor | $25k / $5k / $1M | curve + composite construction |

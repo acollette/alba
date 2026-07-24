@@ -80,7 +80,7 @@
 </div>
 
 <script>
-const OFFER_PCT = Number(new URLSearchParams(location.search).get("offer") ?? 8.20);
+const OFFER_PCT = Number(new URLSearchParams(location.search).get("offer") ?? 4.60);
 const OFFER_DAYS = Number(new URLSearchParams(location.search).get("tenor") ?? 90);
 const css = (v) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(v).trim();
 
@@ -97,7 +97,7 @@ async function main() {
   const tiles = [
     { label: "Midnight " + OFFER_DAYS + "d benchmark", value: fmt(bench.aprPct) + "%", sub: bench.method },
     { label: "Floating composite (weighted)", value: fmt(composite.borrowApr) + "%", sub: composite.venues.join(" · ") + " · $" + (composite.totalBorrowUSD / 1e6).toFixed(0) + "M borrow" },
-    { label: "Desk model · 90d · 150% collateral", value: fmt(suggested.suggestedAprPct) + "%", sub: "benchmark + " + suggested.breakdown.gapRiskBps + "bps gap risk + " + suggested.breakdown.liquidityPremiumBps + "bps liquidity" },
+    { label: "Desk model · 90d · 130/115 margining", value: fmt(suggested.suggestedAprPct) + "%", sub: "benchmark + " + suggested.breakdown.residualRiskBps + "bps residual + " + suggested.breakdown.liquidityPremiumBps + "bps liquidity" },
     { label: "This facility", value: fmt(OFFER_PCT) + "%", sub: spread(OFFER_PCT, suggested.suggestedAprPct) + " vs model" },
   ];
   document.getElementById("tiles").innerHTML = tiles.map((t) =>

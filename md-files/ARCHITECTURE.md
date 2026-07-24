@@ -34,7 +34,8 @@ Frontend (Next.js) + services/rates (Graph standardized-lending query + Midnight
 - **Open/draw leg:** static-balance SwapVM order, Aqua mode. Each draw = partial fill. `_stopWhenCovered(facilitySize)` caps cumulative draws.
 - **Per draw:** pro-rata cbBTC locks in `CollateralEscrow` (150%, model-sized — see PRICING.md); a maturity leg arms; `DealRegistry` creates a Hedera scheduled tx for `now + term`.
 - **Maturity leg:** SwapVM order pulling `drawn × (1 + rate·term)` USDC from borrower via Aqua. Gated by `_notBefore(T)` and `_onlyTaker(executor)`. Zero-coupon: no per-block accrual; yield realized atomically at settlement.
-- **Default path:** repayment pull reverts → same tx arms the pre-registered Dutch auction program. Escrow acts as Aqua maker for cbBTC; price starts ~105% of oracle and decays; permissionless fillers (existing Aqua solver network) fill partially; `_stopWhenCovered(debt)` halts sales the moment the lender is made whole; surplus cbBTC reclaimable by borrower. Decay is floored (~85% of oracle) — never race to zero.
+- **Continuous margining:** health = collateral value ≥ 115% × accrued debt, checkable by ANYONE at any time (`liquidate` is permissionless, oracle-verified). The Hedera sentinel — a self-rescheduling schedule — CHECKs it keeper-free. On breach, gentlest-first waterfall: (1) FULL CURE: pull the accrued debt from the borrower's Aqua-authorized cure leg → early close, collateral home, zero penalty; (2) PARTIAL CURE: pull what's available; health restored → the draw lives on; (3) AUCTION only for a drained borrower.
+- **Default/auction path:** at maturity a failed repayment pull arms the Dutch auction in the same tx; mid-term it is tier 3 of the waterfall. Price starts ~105% of oracle AT ARM TIME and decays; permissionless fillers fill partially; `_stopWhenCovered(debt)` halts sales the moment the lender is made whole; surplus cbBTC reclaimable by borrower. Decay is floored (~85% of oracle) — never race to zero.
 
 ## Contract specs
 
@@ -77,7 +78,7 @@ Thin, deliberately. Canonical record: facility terms, parties, draws, states (AC
 
 ## Trust model / known cuts (state these proactively)
 
-- **Maturity-only collateral checks**, model-sized (150% — the gap-risk put priced in PRICING.md; auction floor ~85% of oracle). Continuous margining + Graph-based sentinel = roadmap. Scope cut, not quality cut — partial liquidation via `_stopWhenCovered` is *better* than fixed-chunk liquidations in production protocols.
+- **Continuous margining is LIVE**, not roadmap: 130% initial / 115% maintenance, permissionless oracle-verified liquidation, cure-first waterfall, Hedera-scheduled sentinel. Partial liquidation via `_stopWhenCovered` sells only what's needed — better than fixed-chunk engines.
 - **No secondary market**, but positions are one ERC-721 wrapper from transferable (receiver field). Item 8; strongest scaling slide.
 - **Oracle:** Chainlink cbBTC/USD on Base for auction start price. Single oracle, acknowledged.
 - **Fee design principle (stolen from Midnight):** caps in code — settlement bps + liquidation fee constants, immutable. "Infrastructure that can't reprice you is infrastructure a treasurer can underwrite."

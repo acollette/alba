@@ -27,7 +27,7 @@ contract Test5_HappyPath is Test {
     uint256 constant FORK_BLOCK = 49_062_000;
 
     uint256 constant FACILITY = 300_000e6;
-    uint256 constant RATE_BPS = 820; // 8.20% simple annual
+    uint256 constant RATE_BPS = 460; // 4.60% simple annual (desk model + margin, docs/PRICING.md)
     uint256 constant TERM = 90 days;
 
     uint256 constant DRAW1 = 100_000e6;

@@ -27,7 +27,7 @@ contract LiveWiring is Script {
     uint256 constant FACILITY = 300_000e6;
     uint256 constant DRAW1 = 100_000e6;
     uint256 constant COLLAT1 = 1.5e8;
-    uint256 constant RATE_BPS = 820;
+    uint256 constant RATE_BPS = 460;
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");

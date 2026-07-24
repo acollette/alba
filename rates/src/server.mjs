@@ -35,7 +35,7 @@ const routes = {
     const bench = benchmark(tenorDays);
     if (!bench) return { error: "no curve" };
     const opts = {};
-    for (const k of ["volAnnual", "recovery", "liquidityPremiumBps", "settlementFeeBps"]) {
+    for (const k of ["residualRiskBps", "liquidityPremiumBps", "settlementFeeBps"]) {
       if (params.has(k)) opts[k] = Number(params.get(k));
     }
     const q = quoteFacilityRate({ tenorDays, collateralRatioBps, benchmarkAprPct: bench.aprPct, opts });
@@ -52,7 +52,7 @@ const routes = {
       floating: band,
       fixed: { curve: midnight.curve, benchmark90d: bench90 },
       suggested90d: bench90
-        ? quoteFacilityRate({ tenorDays: 90, collateralRatioBps: 15_000, benchmarkAprPct: bench90.aprPct })
+        ? quoteFacilityRate({ tenorDays: 90, collateralRatioBps: 13_000, benchmarkAprPct: bench90.aprPct })
         : null,
     };
   },
