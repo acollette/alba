@@ -12,6 +12,7 @@ import {SwapVM} from "swap-vm/src/SwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
+import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
@@ -37,6 +38,7 @@ contract Test6_DefaultPath is Test {
     uint64 constant DECAY = 0.99994e18; // ≈80.6% of start after 3600s
 
     TermRouter router;
+    ChronosOrderBuilder builder;
     CollateralEscrow escrow;
     TokenMock usdc;
     TokenMock cbbtc;
@@ -56,7 +58,8 @@ contract Test6_DefaultPath is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        escrow = new CollateralEscrow(executor, router, feeSink);
+        builder = new ChronosOrderBuilder(address(AQUA));
+        escrow = new CollateralEscrow(executor, router, builder, feeSink);
         usdc = new TokenMock("Mock USDC", "USDC");
         cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
 
@@ -67,7 +70,7 @@ contract Test6_DefaultPath is Test {
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (facilityOrder, strategy, tokens, amounts) = router.buildFacilityLeg(
+        (facilityOrder, strategy, tokens, amounts) = builder.buildFacilityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: lender,
                 counterToken: address(cbbtc),
@@ -81,14 +84,14 @@ contract Test6_DefaultPath is Test {
 
         cbbtc.mint(borrower, COLLAT1);
         maturity = uint40(block.timestamp + TERM);
-        repayment = router.repaymentAmount(DRAW1, RATE_BPS, TERM);
+        repayment = builder.repaymentAmount(DRAW1, RATE_BPS, TERM);
 
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
         escrow.lockFor(bytes32(uint256(1)), IERC20(address(cbbtc)), COLLAT1);
         router.swap(facilityOrder, address(cbbtc), address(usdc), DRAW1, _pullData(borrower));
-        (maturityOrder, strategy, tokens, amounts) = router.buildMaturityLeg(
+        (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: borrower,
                 counterToken: address(cbbtc),
@@ -172,7 +175,7 @@ contract Test6_DefaultPath is Test {
         uint256 target = repayment + fee;
 
         // Rebuild the auction order via the same single source of truth
-        ISwapVM.Order memory auctionOrder = router.buildAuctionLeg(
+        ISwapVM.Order memory auctionOrder = builder.buildAuctionLeg(
             ChronosProgramBuilder.AuctionTerms({
                 maker: address(escrow),
                 bidToken: address(usdc),

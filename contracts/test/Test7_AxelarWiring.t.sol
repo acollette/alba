@@ -11,6 +11,7 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
+import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {AxelarSettlementExecutor} from "../src/AxelarSettlementExecutor.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
@@ -42,6 +43,7 @@ contract Test7_AxelarWiring is Test {
     string constant SOURCE_ADDR = "0xDEA1Re915";
 
     TermRouter router;
+    ChronosOrderBuilder builder;
     CollateralEscrow escrow;
     AxelarSettlementExecutor executor;
     MockAxelarGateway gateway;
@@ -61,9 +63,10 @@ contract Test7_AxelarWiring is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
+        builder = new ChronosOrderBuilder(address(AQUA));
         gateway = new MockAxelarGateway();
         executor = new AxelarSettlementExecutor(address(gateway), router, SOURCE_CHAIN, SOURCE_ADDR);
-        escrow = new CollateralEscrow(address(executor), router, feeSink);
+        escrow = new CollateralEscrow(address(executor), router, builder, feeSink);
         executor.setEscrow(escrow);
 
         usdc = new TokenMock("Mock USDC", "USDC");
@@ -76,7 +79,7 @@ contract Test7_AxelarWiring is Test {
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (facilityOrder, strategy, tokens, amounts) = router.buildFacilityLeg(
+        (facilityOrder, strategy, tokens, amounts) = builder.buildFacilityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: lender,
                 counterToken: address(cbbtc),
@@ -91,7 +94,7 @@ contract Test7_AxelarWiring is Test {
         // Draw + arm maturity leg + register settlement package with the executor
         cbbtc.mint(borrower, COLLAT1);
         maturity = uint40(block.timestamp + TERM);
-        repayment = router.repaymentAmount(DRAW1, RATE_BPS, TERM);
+        repayment = builder.repaymentAmount(DRAW1, RATE_BPS, TERM);
         usdc.mint(borrower, repayment - DRAW1); // interest portion; principal comes from the draw
 
         vm.startPrank(borrower);
@@ -99,7 +102,7 @@ contract Test7_AxelarWiring is Test {
         usdc.approve(address(AQUA), type(uint256).max);
         escrow.lockFor(DRAW_ID, IERC20(address(cbbtc)), COLLAT1);
         router.swap(facilityOrder, address(cbbtc), address(usdc), DRAW1, _pullData(borrower));
-        (maturityOrder, strategy, tokens, amounts) = router.buildMaturityLeg(
+        (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: borrower,
                 counterToken: address(cbbtc),

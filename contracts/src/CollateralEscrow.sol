@@ -71,6 +71,7 @@ contract CollateralEscrow {
     /// @notice Settlement executor (AxelarSettlementExecutor in production, manual in tests)
     address public immutable EXECUTOR;
     TermRouter public immutable ROUTER;
+    ChronosProgramBuilder public immutable BUILDER;
     address public immutable FEE_SINK;
 
     mapping(bytes32 drawId => Draw) public draws;
@@ -83,9 +84,10 @@ contract CollateralEscrow {
         _;
     }
 
-    constructor(address executor, TermRouter router, address feeSink) {
+    constructor(address executor, TermRouter router, ChronosProgramBuilder builder, address feeSink) {
         EXECUTOR = executor;
         ROUTER = router;
+        BUILDER = builder;
         FEE_SINK = feeSink;
     }
 
@@ -132,7 +134,7 @@ contract CollateralEscrow {
         draw.state = DrawState.AUCTIONING;
 
         uint256 fee = (debt * LIQ_FEE_BPS) / 10_000;
-        ISwapVM.Order memory order = ROUTER.buildAuctionLeg(
+        ISwapVM.Order memory order = BUILDER.buildAuctionLeg(
             ChronosProgramBuilder.AuctionTerms({
                 maker: address(this),
                 bidToken: address(bidToken),

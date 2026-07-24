@@ -11,6 +11,7 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
+import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
@@ -34,6 +35,7 @@ contract Test5_HappyPath is Test {
     uint256 constant COLLAT2 = 0.65e8;
 
     TermRouter router;
+    ChronosOrderBuilder builder;
     CollateralEscrow escrow;
     TokenMock usdc;
     TokenMock cbbtc;
@@ -48,7 +50,8 @@ contract Test5_HappyPath is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        escrow = new CollateralEscrow(executor, router, makeAddr("feeSink"));
+        builder = new ChronosOrderBuilder(address(AQUA));
+        escrow = new CollateralEscrow(executor, router, builder, makeAddr("feeSink"));
         usdc = new TokenMock("Mock USDC", "USDC");
         cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
 
@@ -60,7 +63,7 @@ contract Test5_HappyPath is Test {
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (facilityOrder, strategy, tokens, amounts) = router.buildFacilityLeg(
+        (facilityOrder, strategy, tokens, amounts) = builder.buildFacilityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: lender,
                 counterToken: address(cbbtc),
@@ -117,11 +120,11 @@ contract Test5_HappyPath is Test {
         vm.prank(borrower);
         router.swap(facilityOrder, address(cbbtc), address(usdc), drawAmount, _pullData(borrower, address(0)));
 
-        repayment = router.repaymentAmount(drawAmount, RATE_BPS, TERM);
+        repayment = builder.repaymentAmount(drawAmount, RATE_BPS, TERM);
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (maturityOrder, strategy, tokens, amounts) = router.buildMaturityLeg(
+        (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
             ChronosProgramBuilder.PullLegTerms({
                 maker: borrower,
                 counterToken: address(cbbtc),

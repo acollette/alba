@@ -10,6 +10,7 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
+import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
 import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
@@ -24,6 +25,7 @@ contract Test2to4_Opcodes is Test {
     uint256 constant REPAYMENT_USDC = 102_022e6;
 
     TermRouter router;
+    ChronosOrderBuilder builder;
     TokenMock usdc;
     TokenMock cbbtc;
 
@@ -35,6 +37,7 @@ contract Test2to4_Opcodes is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
+        builder = new ChronosOrderBuilder(address(AQUA));
         usdc = new TokenMock("Mock USDC", "USDC");
         cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
 
@@ -102,7 +105,7 @@ contract Test2to4_Opcodes is Test {
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (order, strategy, tokens, amounts) = router.buildFacilityLeg(_facilityTerms(lender, FACILITY_USDC));
+        (order, strategy, tokens, amounts) = builder.buildFacilityLeg(_facilityTerms(lender, FACILITY_USDC));
         vm.prank(lender);
         orderHash = AQUA.ship(address(router), strategy, tokens, amounts);
     }
@@ -112,7 +115,7 @@ contract Test2to4_Opcodes is Test {
         address[] memory tokens;
         uint256[] memory amounts;
         (order, strategy, tokens, amounts) =
-            router.buildMaturityLeg(_facilityTerms(borrower, REPAYMENT_USDC), maturity, executor);
+            builder.buildMaturityLeg(_facilityTerms(borrower, REPAYMENT_USDC), maturity, executor);
         vm.prank(borrower);
         orderHash = AQUA.ship(address(router), strategy, tokens, amounts);
     }

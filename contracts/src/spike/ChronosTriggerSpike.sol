@@ -40,7 +40,8 @@ contract ChronosTriggerSpike {
     /// @notice Send the GMP message now. `axelarGasTinybars` is taken from the contract's
     /// own balance and forwarded to the gas service (native-token gas payment).
     function dispatch(uint256 facilityId, uint256 drawId, string calldata action, uint256 axelarGasTinybars) public {
-        bytes memory payload = abi.encode(facilityId, drawId, action);
+        // Payload shape per ARCHITECTURE.md: (facilityId, drawId, epoch, action); epoch 0 for single-shot
+        bytes memory payload = abi.encode(facilityId, drawId, uint256(0), action);
         if (axelarGasTinybars > 0) {
             gasService.payNativeGasForContractCall{value: axelarGasTinybars}(
                 address(this), destinationChain, destinationAddress, payload, owner

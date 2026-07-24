@@ -2,20 +2,14 @@
 pragma solidity 0.8.30;
 
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
-import {Context} from "swap-vm/src/libs/VM.sol";
 import {MakerTraitsLib} from "swap-vm/src/libs/MakerTraits.sol";
-import {Opcodes} from "swap-vm/src/opcodes/Opcodes.sol";
 import {LimitSwapArgsBuilder} from "swap-vm/src/instructions/LimitSwap.sol";
 import {DutchAuctionArgsBuilder} from "swap-vm/src/instructions/DutchAuction.sol";
 import {BalancesArgsBuilder} from "swap-vm/src/instructions/Balances.sol";
 import {Program, ProgramBuilder} from "swap-vm/test/utils/ProgramBuilder.sol";
 
-import {
-    ChronosOpcodes,
-    NotBeforeArgsBuilder,
-    OnlyTakerArgsBuilder,
-    StopWhenCoveredArgsBuilder
-} from "../opcodes/ChronosOpcodes.sol";
+import {NotBeforeArgsBuilder, OnlyTakerArgsBuilder, StopWhenCoveredArgsBuilder} from "../opcodes/ChronosOpcodes.sol";
+import {ChronosInstructionSet} from "../opcodes/ChronosInstructionSet.sol";
 
 /// @title ChronosProgramBuilder — single source of truth for order construction
 /// @notice Every Chronos order is built here and ONLY here. `aqua.ship()` calldata and the
@@ -31,7 +25,7 @@ import {
 /// transfer when amountIn == 0). All economics (zero-coupon repayment = drawn × (1 + r·t))
 /// are computed HERE when sizing the shipped amounts. Collateral never touches the VM;
 /// it locks in CollateralEscrow.
-abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
+abstract contract ChronosProgramBuilder is ChronosInstructionSet {
     using ProgramBuilder for Program;
 
     /// @param maker Liquidity owner: lender (facility leg) or borrower (maturity leg)
@@ -60,7 +54,7 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
             uint256[] memory amounts
         )
     {
-        Program memory p = ProgramBuilder.init(_instructions());
+        Program memory p = ProgramBuilder.init(_chronosInstructions());
         bytes memory bytecode = bytes.concat(
             p.build(_salt, abi.encodePacked(t.salt)),
             p.build(_stopWhenCovered, StopWhenCoveredArgsBuilder.build(false, t.amount))
@@ -82,7 +76,7 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
             uint256[] memory amounts
         )
     {
-        Program memory p = ProgramBuilder.init(_instructions());
+        Program memory p = ProgramBuilder.init(_chronosInstructions());
         bytes memory bytecode = bytes.concat(
             p.build(_notBefore, NotBeforeArgsBuilder.build(maturity)),
             p.build(_onlyTaker, OnlyTakerArgsBuilder.build(executor)),
@@ -112,7 +106,7 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
             uint256[] memory amounts
         )
     {
-        Program memory p = ProgramBuilder.init(_instructions());
+        Program memory p = ProgramBuilder.init(_chronosInstructions());
         bytes memory bytecode = bytes.concat(
             p.build(_salt, abi.encodePacked(salt)),
             p.build(_limitSwap1D, LimitSwapArgsBuilder.build(takerToken, makerToken))
@@ -159,7 +153,7 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
     /// program bytes on every fill, so the price is purely time-decayed. Collateral custody
     /// stays capped by the escrow's bounded router allowance.
     function buildAuctionLeg(AuctionTerms memory t) public pure returns (ISwapVM.Order memory order) {
-        Program memory p = ProgramBuilder.init(_instructions());
+        Program memory p = ProgramBuilder.init(_chronosInstructions());
         address[] memory tokens = new address[](2);
         uint256[] memory balances = new uint256[](2);
         tokens[0] = t.bidToken;
@@ -232,11 +226,4 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
         amounts[0] = 0;
         amounts[1] = t.amount;
     }
-
-    /// @dev Resolved by TermRouter with the composed opcode table (built-ins + Chronos)
-    function _instructions()
-        internal
-        pure
-        virtual
-        returns (function(Context memory, bytes calldata) internal[] memory);
 }
