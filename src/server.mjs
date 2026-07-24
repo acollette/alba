@@ -60,4 +60,4 @@ createServer(async (req, res) => {
     res.writeHead(502, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: String(err.message ?? err) }));
   }
-}).listen(PORT, () => console.log(`chronos-rates listening on :${PORT}`));
+}).listen(PORT, () => console.log(`alba-rates listening on :${PORT}`));

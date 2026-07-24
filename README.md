@@ -1,6 +1,6 @@
-# chronos-rates
+# alba-rates
 
-Rates layer for **Chronos** (on-chain revolving credit, settled by schedule). Two live data
+Rates layer for **Alba** (on-chain revolving credit, settled by schedule). Two live data
 sources, one tiny zero-dependency Node service:
 
 1. **Floating-rate band — The Graph.** One Messari-standardized lending query — the *same
@@ -10,7 +10,7 @@ sources, one tiny zero-dependency Node service:
 2. **Fixed-rate benchmark — Morpho Midnight.** The live cbBTC/USDC fixed-rate curve, read
    from Midnight's public API over indexed on-chain order books (core contract on Base:
    `0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a`), ticks converted to zero-coupon prices and
-   implied APRs. Chronos facilities are priced as a spread over this curve.
+   implied APRs. Alba facilities are priced as a spread over this curve.
 
 ## Subgraphs consumed (Messari standardized lending schema, Base, decentralized network)
 
@@ -44,14 +44,14 @@ cp .env.example .env   # add your Graph gateway API key
 GRAPH_API_KEY=... node src/server.mjs
 ```
 
-- `GET /api/rates` — everything (used by the Chronos frontend)
+- `GET /api/rates` — everything (used by the Alba frontend)
 - `GET /api/floating-band` — per-protocol variable USDC borrow/supply APRs + min/max band
 - `GET /api/midnight-curve` — maturity, days, implied APR, zero-coupon price per point,
-  plus a 90d interpolation (the default Chronos draw tenor)
+  plus a 90d interpolation (the default Alba draw tenor)
 - `GET /` — dashboard
 
 All responses are computed from **live endpoints at request time** (90s cache); nothing is
 mocked or checkpointed.
 
-Part of the Chronos project (ETHGlobal Lisbon 2026) — contracts repo:
+Part of the Alba project (ETHGlobal Lisbon 2026) — contracts repo:
 [acollette/alba](https://github.com/acollette/alba). MIT.
