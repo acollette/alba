@@ -1,3 +1,6 @@
 [submodule "contracts/lib/axelar-gmp-sdk-solidity"]
 	path = contracts/lib/axelar-gmp-sdk-solidity
 	url = https://github.com/axelarnetwork/axelar-gmp-sdk-solidity
+[submodule "contracts/lib/swap-vm"]
+	path = contracts/lib/swap-vm
+	url = https://github.com/1inch/swap-vm
