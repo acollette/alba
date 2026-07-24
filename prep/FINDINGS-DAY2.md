@@ -21,7 +21,12 @@ The Morpho Midnight benchmark curve is fully readable, live:
   this offer: +z bps" in the facility card. On-chain read possible via the core
   contract if we want the flex; API is the pragmatic Day 2 path.
 
-## Graph spike 🟡 QUERY PROVEN, BLOCKED ON API KEY (user re-checking)
+## Graph spike ✅ GREEN (key fixed)
+
+Live results, one identical query, four protocols, all Base, all via gateway:
+aave-v3 USDC borrow 4.35% ($152M borrowed) · compound-v3 3.90% ($298M) ·
+moonwell 14.58% ($13M) · seamless 1.05% (small). Floating band (majors): ~3.9–4.35%.
+Note: some markets return `name: null` — service must null-guard. Original notes:
 
 - **Morpho Blue has NO Messari-standardized subgraph** (Base or queryable mainnet).
   Swap: **Moonwell** (and optionally Seamless) — BOTH on Base. Upgraded story:
