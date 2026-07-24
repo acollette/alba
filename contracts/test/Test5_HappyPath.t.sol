@@ -11,11 +11,11 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
-import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {AlbaOpcodes} from "../src/opcodes/AlbaOpcodes.sol";
+import {AlbaOrderBuilder} from "../src/AlbaOrderBuilder.sol";
 import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
-import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
+import {AlbaProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @notice Test 5 — full happy path with a manual executor:
 /// publish 300k facility → draw 100k → draw 50k → warp to maturity →
@@ -37,7 +37,7 @@ contract Test5_HappyPath is Test {
     uint256 constant COLLAT2 = 0.65e8;
 
     TermRouter router;
-    ChronosOrderBuilder builder;
+    AlbaOrderBuilder builder;
     MockV3Aggregator oracle;
     CollateralEscrow escrow;
     TokenCustomDecimalsMock usdc;
@@ -55,7 +55,7 @@ contract Test5_HappyPath is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        builder = new ChronosOrderBuilder(address(AQUA));
+        builder = new AlbaOrderBuilder(address(AQUA));
         oracle = new MockV3Aggregator(8, 100_000e8);
         escrow = new CollateralEscrow(executor, router, builder, makeAddr("feeSink"));
         usdc = new TokenCustomDecimalsMock("Mock USDC", "USDC", 0, 6);
@@ -70,7 +70,7 @@ contract Test5_HappyPath is Test {
         address[] memory tokens;
         uint256[] memory amounts;
         (facilityOrder, strategy, tokens, amounts) = builder.buildFacilityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: lender,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
@@ -140,7 +140,7 @@ contract Test5_HappyPath is Test {
         address[] memory tokens;
         uint256[] memory amounts;
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: borrower,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
@@ -216,7 +216,7 @@ contract Test5_HappyPath is Test {
     }
 
     function test_Draw_OnlyViaEscrow_StrangerCannotDrawUncollateralized() public {
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.UnauthorizedTaker.selector, borrower, address(escrow)));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.UnauthorizedTaker.selector, borrower, address(escrow)));
         vm.prank(borrower);
         router.swap(facilityOrder, address(cbbtc), address(usdc), 1_000e6, _pullData(borrower, address(0)));
     }

@@ -10,11 +10,11 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {AlbaOrderBuilder} from "../src/AlbaOrderBuilder.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {AxelarSettlementExecutor} from "../src/AxelarSettlementExecutor.sol";
 import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
-import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
+import {AlbaProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @notice Live wiring on Base Sepolia: deploy the real stack (router, builder, executor,
 /// escrow), publish a facility, lock collateral, draw, arm the maturity leg, and register
@@ -39,12 +39,12 @@ contract LiveWiring is Script {
 
         // Honest decimals (USDC 6, cbBTC 8) + collateral/USD oracle (mock: no cbBTC/USD
         // feed exists on Base Sepolia; production wiring = Chainlink on Base mainnet)
-        TokenCustomDecimalsMock usdc = new TokenCustomDecimalsMock("Chronos USDC", "USDC", 0, 6);
-        TokenCustomDecimalsMock cbbtc = new TokenCustomDecimalsMock("Chronos cbBTC", "CBBTC", 0, 8);
+        TokenCustomDecimalsMock usdc = new TokenCustomDecimalsMock("Alba USDC", "USDC", 0, 6);
+        TokenCustomDecimalsMock cbbtc = new TokenCustomDecimalsMock("Alba cbBTC", "CBBTC", 0, 8);
         MockV3Aggregator oracle = new MockV3Aggregator(8, 100_000e8);
 
         TermRouter router = new TermRouter(address(aqua), WETH, me);
-        ChronosOrderBuilder builder = new ChronosOrderBuilder(address(aqua));
+        AlbaOrderBuilder builder = new AlbaOrderBuilder(address(aqua));
         AxelarSettlementExecutor executor =
             new AxelarSettlementExecutor(AXELAR_GATEWAY, router, "hedera", triggerAddrStr);
         CollateralEscrow escrow = new CollateralEscrow(address(executor), router, builder, me);
@@ -55,7 +55,7 @@ contract LiveWiring is Script {
         usdc.approve(address(aqua), type(uint256).max);
         (ISwapVM.Order memory facilityOrder, bytes memory strategy, address[] memory tokens, uint256[] memory amounts) =
         builder.buildFacilityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: me,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
@@ -83,7 +83,7 @@ contract LiveWiring is Script {
             address[] memory mTokens,
             uint256[] memory mAmounts
         ) = builder.buildMaturityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: me,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),

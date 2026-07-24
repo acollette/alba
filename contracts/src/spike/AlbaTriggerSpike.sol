@@ -11,7 +11,7 @@ import {IHederaScheduleService, HSS_ADDRESS, HSS_SUCCESS} from "./IHederaSchedul
 ///
 /// The contract funds Axelar gas from its own HBAR balance so the scheduled execution
 /// is fully self-contained. Fund it after deploy; `withdraw` recovers leftovers.
-contract ChronosTriggerSpike {
+contract AlbaTriggerSpike {
     error ScheduleFailed(int64 code);
     error NotOwner();
     error NotDispatcher(address caller);

@@ -44,10 +44,10 @@ library StopWhenCoveredArgsBuilder {
     }
 }
 
-/// @title ChronosOpcodes — custom SwapVM instructions for term credit
+/// @title AlbaOpcodes — custom SwapVM instructions for term credit
 /// @notice Storage and static-context discipline mirror swap-vm's Invalidators pattern:
 /// checks run in both contexts, storage writes only when `!isStaticContext`.
-contract ChronosOpcodes {
+contract AlbaOpcodes {
     using ContextLib for Context;
 
     error TooEarly(uint256 notBefore, uint256 currentTime);

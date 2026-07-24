@@ -1,6 +1,6 @@
 # CLAUDE.md — Execution Guide
 
-You are assisting on **Chronos**: revolving credit facilities + term loans as SwapVM programs, Aqua-mode settlement, Hedera Schedule Service + Axelar GMP as the keeper-free maturity trigger, liquidated by Dutch auction. Two-day hackathon build (ETHGlobal Lisbon 2026). Read `docs/ARCHITECTURE.md`, `docs/OPCODES.md`, `docs/PLAN.md` before writing code.
+You are assisting on **Alba**: revolving credit facilities + term loans as SwapVM programs, Aqua-mode settlement, Hedera Schedule Service + Axelar GMP as the keeper-free maturity trigger, liquidated by Dutch auction. Two-day hackathon build (ETHGlobal Lisbon 2026). Read `docs/ARCHITECTURE.md`, `docs/OPCODES.md`, `docs/PLAN.md` before writing code.
 
 ## Non-negotiables
 
@@ -22,10 +22,10 @@ You are assisting on **Chronos**: revolving credit facilities + term loans as Sw
 ## Codebase conventions
 
 - Solidity ^0.8.x, Foundry. `forge fmt` before commit. Custom errors, no revert strings. NatSpec on external functions.
-- Layout: `src/TermRouter.sol`, `src/opcodes/ChronosOpcodes.sol`, `src/CollateralEscrow.sol`, `src/AxelarSettlementExecutor.sol`, `src/hedera/DealRegistry.sol`, `src/lib/ProgramBuilder.sol` (+ TS mirror in `frontend/lib/program.ts` generated or hand-synced with a fixture test proving byte equality).
+- Layout: `src/TermRouter.sol`, `src/opcodes/AlbaOpcodes.sol`, `src/CollateralEscrow.sol`, `src/AxelarSettlementExecutor.sol`, `src/hedera/DealRegistry.sol`, `src/lib/ProgramBuilder.sol` (+ TS mirror in `frontend/lib/program.ts` generated or hand-synced with a fixture test proving byte equality).
 - Fork tests: Base mainnet fork pinned to a block; addresses in `.env` (`AQUA`, `SWAPVM_*`, `CHAINLINK_CBBTC_USD`, `AXELAR_GATEWAY_*`, `MIDNIGHT_*`).
 - Frontend: Next.js + wagmi/viem. Functional > pretty until Day 2 hour 8. No component-library rabbit holes.
-- `services/rates` lives in the SEPARATE MIT repo (`chronos-rates`) — Graph submission requires open source; keep it decoupled from contracts repo.
+- `services/rates` lives in the SEPARATE MIT repo (`alba-rates`) — Graph submission requires open source; keep it decoupled from contracts repo.
 
 ## When blocked (in order)
 

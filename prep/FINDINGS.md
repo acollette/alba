@@ -80,7 +80,7 @@ distribution terms with the 1inch team in person before choosing contracts-repo 
    pricing. → Draw and maturity legs are **zero-amountIn exact-out pulls**
    (`allowZeroAmountIn`, no pricing instruction; `SwapVM._transferIn` skips the taker
    transfer at amountIn == 0). Zero-coupon economics (repayment = drawn × (1+r·t)) are
-   computed in ChronosProgramBuilder when sizing shipped amounts. This *strengthens* the
+   computed in AlbaProgramBuilder when sizing shipped amounts. This *strengthens* the
    story: settlement really is "a machine pulls a scheduled amount from a ledger".
 2. **Clamp-don't-revert is structurally impossible for the taker-specified register** —
    `TakerTraits.validate` pins it to the request (quote validates identically). As built:

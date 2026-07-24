@@ -8,24 +8,24 @@ import {DutchAuctionArgsBuilder} from "swap-vm/src/instructions/DutchAuction.sol
 import {BalancesArgsBuilder} from "swap-vm/src/instructions/Balances.sol";
 import {Program, ProgramBuilder} from "swap-vm/test/utils/ProgramBuilder.sol";
 
-import {NotBeforeArgsBuilder, OnlyTakerArgsBuilder, StopWhenCoveredArgsBuilder} from "../opcodes/ChronosOpcodes.sol";
-import {ChronosInstructionSet} from "../opcodes/ChronosInstructionSet.sol";
+import {NotBeforeArgsBuilder, OnlyTakerArgsBuilder, StopWhenCoveredArgsBuilder} from "../opcodes/AlbaOpcodes.sol";
+import {AlbaInstructionSet} from "../opcodes/AlbaInstructionSet.sol";
 
-/// @title ChronosProgramBuilder — single source of truth for order construction
-/// @notice Every Chronos order is built here and ONLY here. `aqua.ship()` calldata and the
+/// @title AlbaProgramBuilder — single source of truth for order construction
+/// @notice Every Alba order is built here and ONLY here. `aqua.ship()` calldata and the
 /// executable order derive from the same `ISwapVM.Order`: the shipped strategy bytes are
 /// `abi.encode(order)`, so `keccak256(strategy) == SwapVM.hash(order)` by construction
 /// (Aqua-mode orderHash is `keccak256(abi.encode(order))`). Never hand-assemble programs.
 ///
 /// @dev DESIGN NOTE — one-way pulls, not swaps. Aqua balances are LIVE: every fill moves
 /// them, so balance-ratio pricing (`_limitSwap1D` over Aqua balances) drifts like an AMM
-/// and cannot express a fixed rate across partial fills. Chronos legs therefore avoid VM
+/// and cannot express a fixed rate across partial fills. Alba legs therefore avoid VM
 /// pricing entirely: draw and repayment legs are zero-amountIn exact-out pulls
 /// (`allowZeroAmountIn` + no pricing instruction — `SwapVM._transferIn` skips the taker
 /// transfer when amountIn == 0). All economics (zero-coupon repayment = drawn × (1 + r·t))
 /// are computed HERE when sizing the shipped amounts. Collateral never touches the VM;
 /// it locks in CollateralEscrow.
-abstract contract ChronosProgramBuilder is ChronosInstructionSet {
+abstract contract AlbaProgramBuilder is AlbaInstructionSet {
     using ProgramBuilder for Program;
 
     /// @param maker Liquidity owner: lender (facility leg) or borrower (maturity leg)
@@ -57,7 +57,7 @@ abstract contract ChronosProgramBuilder is ChronosInstructionSet {
             uint256[] memory amounts
         )
     {
-        Program memory p = ProgramBuilder.init(_chronosInstructions());
+        Program memory p = ProgramBuilder.init(_albaInstructions());
         bytes memory bytecode = bytes.concat(
             p.build(_onlyTaker, OnlyTakerArgsBuilder.build(taker)),
             p.build(_salt, abi.encodePacked(t.salt)),
@@ -80,7 +80,7 @@ abstract contract ChronosProgramBuilder is ChronosInstructionSet {
             uint256[] memory amounts
         )
     {
-        Program memory p = ProgramBuilder.init(_chronosInstructions());
+        Program memory p = ProgramBuilder.init(_albaInstructions());
         bytes memory bytecode = bytes.concat(
             p.build(_notBefore, NotBeforeArgsBuilder.build(maturity)),
             p.build(_onlyTaker, OnlyTakerArgsBuilder.build(executor)),
@@ -110,7 +110,7 @@ abstract contract ChronosProgramBuilder is ChronosInstructionSet {
             uint256[] memory amounts
         )
     {
-        Program memory p = ProgramBuilder.init(_chronosInstructions());
+        Program memory p = ProgramBuilder.init(_albaInstructions());
         bytes memory bytecode = bytes.concat(
             p.build(_salt, abi.encodePacked(salt)),
             p.build(_limitSwap1D, LimitSwapArgsBuilder.build(takerToken, makerToken))
@@ -157,7 +157,7 @@ abstract contract ChronosProgramBuilder is ChronosInstructionSet {
     /// program bytes on every fill, so the price is purely time-decayed. Collateral custody
     /// stays capped by the escrow's bounded router allowance.
     function buildAuctionLeg(AuctionTerms memory t) public pure returns (ISwapVM.Order memory order) {
-        Program memory p = ProgramBuilder.init(_chronosInstructions());
+        Program memory p = ProgramBuilder.init(_albaInstructions());
         address[] memory tokens = new address[](2);
         uint256[] memory balances = new uint256[](2);
         tokens[0] = t.bidToken;

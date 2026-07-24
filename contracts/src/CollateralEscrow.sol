@@ -9,9 +9,9 @@ import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "./TermRouter.sol";
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
-import {ChronosProgramBuilder} from "./lib/ProgramBuilder.sol";
+import {AlbaProgramBuilder} from "./lib/ProgramBuilder.sol";
 
-/// @title CollateralEscrow — per-draw collateral custody + auction maker for Chronos
+/// @title CollateralEscrow — per-draw collateral custody + auction maker for Alba
 /// @notice Collateral never enters Aqua while a loan is healthy: pull-rights over a wallet
 /// the borrower controls are worthless, so collateral sits in code. Only after a confirmed
 /// failed repayment pull does `armAuction` open a sale path over the collateral.
@@ -103,7 +103,7 @@ contract CollateralEscrow {
     /// @notice Settlement executor (AxelarSettlementExecutor in production, manual in tests)
     address public immutable EXECUTOR;
     TermRouter public immutable ROUTER;
-    ChronosProgramBuilder public immutable BUILDER;
+    AlbaProgramBuilder public immutable BUILDER;
     address public immutable FEE_SINK;
 
     mapping(bytes32 facilityId => Facility) public facilities;
@@ -117,7 +117,7 @@ contract CollateralEscrow {
         _;
     }
 
-    constructor(address executor, TermRouter router, ChronosProgramBuilder builder, address feeSink) {
+    constructor(address executor, TermRouter router, AlbaProgramBuilder builder, address feeSink) {
         EXECUTOR = executor;
         ROUTER = router;
         BUILDER = builder;
@@ -261,7 +261,7 @@ contract CollateralEscrow {
 
         uint256 fee = (debt * LIQ_FEE_BPS) / 10_000;
         ISwapVM.Order memory order = BUILDER.buildAuctionLeg(
-            ChronosProgramBuilder.AuctionTerms({
+            AlbaProgramBuilder.AuctionTerms({
                 maker: address(this),
                 bidToken: address(f.loanToken),
                 collateralToken: address(draw.token),

@@ -25,7 +25,7 @@ No project code before the hackathon (qualification), but throwaway experiments 
 - **HOUR-4 GATE:** if broken → fallback = Hedera-testnet schedule EXISTS and fires on Hedera + manually-relayed message to Base fork, narrated honestly ("relay is Axelar in production; here's the P2 tx proving the path"). Decide at hour 4, not hour 20.
 
 **Hours 5–9: Foundry on a Base fork.**
-- Scaffold `TermRouter` (inherit `AquaSwapVMRouter` + `ChronosOpcodes`).
+- Scaffold `TermRouter` (inherit `AquaSwapVMRouter` + `AlbaOpcodes`).
 - Shared program-builder helper (single source of truth: ship calldata ⟷ executable order).
 - Test 1 (ship→execute round trip) GREEN before anything else.
 - Opcodes in order: `_notBefore` → `_onlyTaker` → `_stopWhenCovered`. Tests 2–4.

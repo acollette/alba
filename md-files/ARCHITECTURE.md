@@ -14,7 +14,7 @@ HEDERA (hub)                      AXELAR                     BASE (money layer)
                                                       ┌────────────────────────────┐
                                                       │ TermRouter                 │
                                                       │  (AquaSwapVMRouter +       │
-                                                      │   ChronosOpcodes)          │
+                                                      │   AlbaOpcodes)          │
                                                       └───┬────────────────┬───────┘
                                                           │                │
                                                      ┌────▼─────┐   ┌──────▼──────────┐
@@ -39,9 +39,9 @@ Frontend (Next.js) + services/rates (Graph standardized-lending query + Midnight
 ## Contract specs
 
 ### TermRouter.sol
-`contract TermRouter is AquaSwapVMRouter, ChronosOpcodes` — override `_instructions()` to append custom opcodes to the standard set. Official Aqua deployment underneath (qualification requirement: official contracts used; redeployed modified SwapVM explicitly allowed).
+`contract TermRouter is AquaSwapVMRouter, AlbaOpcodes` — override `_instructions()` to append custom opcodes to the standard set. Official Aqua deployment underneath (qualification requirement: official contracts used; redeployed modified SwapVM explicitly allowed).
 
-### ChronosOpcodes.sol
+### AlbaOpcodes.sol
 See `docs/OPCODES.md`. Three instructions: `_notBefore`, `_onlyTaker`, `_stopWhenCovered`.
 
 ### CollateralEscrow.sol

@@ -1,4 +1,4 @@
-# Chronos — On-Chain Revolving Credit, Settled by Schedule
+# Alba — On-Chain Revolving Credit, Settled by Schedule
 
 > Working name. Register final name + domain before the event.
 
@@ -32,7 +32,7 @@
 contracts/           Foundry project (see docs/ARCHITECTURE.md)
   src/
     TermRouter.sol         AquaSwapVMRouter + custom opcodes
-    opcodes/ChronosOpcodes.sol
+    opcodes/AlbaOpcodes.sol
     CollateralEscrow.sol
     AxelarSettlementExecutor.sol
     hedera/DealRegistry.sol

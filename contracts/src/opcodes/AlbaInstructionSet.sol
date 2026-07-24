@@ -9,29 +9,21 @@ import {LimitSwap} from "swap-vm/src/instructions/LimitSwap.sol";
 import {DutchAuction} from "swap-vm/src/instructions/DutchAuction.sol";
 import {Fee} from "swap-vm/src/instructions/Fee.sol";
 
-import {ChronosOpcodes} from "./ChronosOpcodes.sol";
+import {AlbaOpcodes} from "./AlbaOpcodes.sol";
 
-/// @title ChronosInstructionSet — THE opcode table, defined exactly once
-/// @notice Both TermRouter (execution) and ChronosOrderBuilder (order construction) inherit
+/// @title AlbaInstructionSet — THE opcode table, defined exactly once
+/// @notice Both TermRouter (execution) and AlbaOrderBuilder (order construction) inherit
 /// this mixin, so program bytes are always encoded and decoded against the same table.
 /// Index layout is IDENTICAL to swap-vm's full `Opcodes` table (46 slots) with the
-/// instruction families Chronos doesn't use pointed at `_notInstruction` — same pattern
+/// instruction families Alba doesn't use pointed at `_notInstruction` — same pattern
 /// 1inch uses in `AquaOpcodes` — which keeps the router under the EIP-170 size limit.
-/// Chronos opcodes sit at indices 46/47/48.
-abstract contract ChronosInstructionSet is
-    Controls,
-    Balances,
-    Invalidators,
-    LimitSwap,
-    DutchAuction,
-    Fee,
-    ChronosOpcodes
-{
+/// Alba opcodes sit at indices 46/47/48.
+abstract contract AlbaInstructionSet is Controls, Balances, Invalidators, LimitSwap, DutchAuction, Fee, AlbaOpcodes {
     constructor(address aqua) Fee(aqua) {}
 
     function _notInstruction(Context memory, bytes calldata) internal view {}
 
-    function _chronosInstructions()
+    function _albaInstructions()
         internal
         pure
         returns (function(Context memory, bytes calldata) internal[] memory result)
@@ -64,7 +56,7 @@ abstract contract ChronosInstructionSet is
             Invalidators._invalidateBit1D,
             Invalidators._invalidateTokenIn1D,
             Invalidators._invalidateTokenOut1D,
-            // 22-24: XYCSwap / XYCConcentrate / Decay — unused by Chronos
+            // 22-24: XYCSwap / XYCConcentrate / Decay — unused by Alba
             _notInstruction,
             _notInstruction,
             _notInstruction,
@@ -97,7 +89,7 @@ abstract contract ChronosInstructionSet is
             Fee._aquaProtocolFeeAmountInXD,
             Fee._dynamicProtocolFeeAmountInXD,
             Fee._aquaDynamicProtocolFeeAmountInXD,
-            // 46-48: Chronos
+            // 46-48: Alba
             _notBefore,
             _onlyTaker,
             _stopWhenCovered

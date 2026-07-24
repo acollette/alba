@@ -12,11 +12,11 @@ import {SwapVM} from "swap-vm/src/SwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {AlbaOrderBuilder} from "../src/AlbaOrderBuilder.sol";
 import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
-import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
-import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
+import {AlbaOpcodes} from "../src/opcodes/AlbaOpcodes.sol";
+import {AlbaProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @notice Test 6 — the default path: borrower drained → repayment pull reverts → auction
 /// armed → two partial fills at a decaying price → auction halts the moment the lender-side
@@ -39,7 +39,7 @@ contract Test6_DefaultPath is Test {
     uint64 constant DECAY = 0.99994e18; // ≈80.6% of start after 3600s
 
     TermRouter router;
-    ChronosOrderBuilder builder;
+    AlbaOrderBuilder builder;
     MockV3Aggregator oracle;
     CollateralEscrow escrow;
     TokenCustomDecimalsMock usdc;
@@ -60,7 +60,7 @@ contract Test6_DefaultPath is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        builder = new ChronosOrderBuilder(address(AQUA));
+        builder = new AlbaOrderBuilder(address(AQUA));
         oracle = new MockV3Aggregator(8, 100_000e8);
         escrow = new CollateralEscrow(executor, router, builder, feeSink);
         usdc = new TokenCustomDecimalsMock("Mock USDC", "USDC", 0, 6);
@@ -74,7 +74,7 @@ contract Test6_DefaultPath is Test {
         address[] memory tokens;
         uint256[] memory amounts;
         (facilityOrder, strategy, tokens, amounts) = builder.buildFacilityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: lender,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
@@ -104,7 +104,7 @@ contract Test6_DefaultPath is Test {
         usdc.approve(address(AQUA), type(uint256).max);
         escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: borrower,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
@@ -188,7 +188,7 @@ contract Test6_DefaultPath is Test {
 
         // Rebuild the auction order via the same single source of truth
         ISwapVM.Order memory auctionOrder = builder.buildAuctionLeg(
-            ChronosProgramBuilder.AuctionTerms({
+            AlbaProgramBuilder.AuctionTerms({
                 maker: address(escrow),
                 bidToken: address(usdc),
                 collateralToken: address(cbbtc),
@@ -222,7 +222,7 @@ contract Test6_DefaultPath is Test {
         usdc.mint(filler1, 1e6);
         vm.prank(filler1);
         usdc.approve(address(router), 1e6);
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.OrderCovered.selector, auctionHash));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.OrderCovered.selector, auctionHash));
         vm.prank(filler1);
         router.swap(auctionOrder, address(usdc), address(cbbtc), 1e6, _fillData(filler1));
 

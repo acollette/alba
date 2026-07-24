@@ -10,9 +10,9 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
-import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
-import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
+import {AlbaOrderBuilder} from "../src/AlbaOrderBuilder.sol";
+import {AlbaOpcodes} from "../src/opcodes/AlbaOpcodes.sol";
+import {AlbaProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @notice Tests 2-4 (OPCODES.md matrix): _notBefore, _onlyTaker, _stopWhenCovered on
 /// zero-in pull legs, including static-context discipline (quote never mutates storage).
@@ -25,7 +25,7 @@ contract Test2to4_Opcodes is Test {
     uint256 constant REPAYMENT_USDC = 102_022e6;
 
     TermRouter router;
-    ChronosOrderBuilder builder;
+    AlbaOrderBuilder builder;
     TokenMock usdc;
     TokenMock cbbtc;
 
@@ -37,7 +37,7 @@ contract Test2to4_Opcodes is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        builder = new ChronosOrderBuilder(address(AQUA));
+        builder = new AlbaOrderBuilder(address(AQUA));
         usdc = new TokenMock("Mock USDC", "USDC");
         cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
 
@@ -55,9 +55,9 @@ contract Test2to4_Opcodes is Test {
     function _facilityTerms(address maker, uint256 amount)
         internal
         view
-        returns (ChronosProgramBuilder.PullLegTerms memory)
+        returns (AlbaProgramBuilder.PullLegTerms memory)
     {
-        return ChronosProgramBuilder.PullLegTerms({
+        return AlbaProgramBuilder.PullLegTerms({
             maker: maker,
             counterToken: address(cbbtc),
             pullToken: address(usdc),
@@ -126,12 +126,12 @@ contract Test2to4_Opcodes is Test {
         uint40 maturity = uint40(block.timestamp + 90 days);
         (ISwapVM.Order memory order,) = _shipMaturityLeg(maturity);
 
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.TooEarly.selector, maturity, block.timestamp));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.TooEarly.selector, maturity, block.timestamp));
         vm.prank(executor);
         router.swap(order, address(cbbtc), address(usdc), REPAYMENT_USDC, _pullData(executor));
 
         // quote (static context) must ALSO revert before maturity
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.TooEarly.selector, maturity, block.timestamp));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.TooEarly.selector, maturity, block.timestamp));
         vm.prank(executor);
         router.quote(order, address(cbbtc), address(usdc), REPAYMENT_USDC, _pullData(executor));
     }
@@ -155,7 +155,7 @@ contract Test2to4_Opcodes is Test {
         (ISwapVM.Order memory order,) = _shipMaturityLeg(maturity);
         vm.warp(maturity);
 
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.UnauthorizedTaker.selector, stranger, executor));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.UnauthorizedTaker.selector, stranger, executor));
         vm.prank(stranger);
         router.swap(order, address(cbbtc), address(usdc), REPAYMENT_USDC, _pullData(stranger));
 
@@ -182,7 +182,7 @@ contract Test2to4_Opcodes is Test {
 
         _pullAs(executor, order, REPAYMENT_USDC);
 
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.OrderCovered.selector, orderHash));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.OrderCovered.selector, orderHash));
         vm.prank(executor);
         router.swap(order, address(cbbtc), address(usdc), 1e6, _pullData(executor));
     }
@@ -207,7 +207,7 @@ contract Test2to4_Opcodes is Test {
 
         _pullAs(borrower, order, 250_000e6);
 
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.StopWhenCoveredExceeded.selector, 100_000e6, 50_000e6));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.StopWhenCoveredExceeded.selector, 100_000e6, 50_000e6));
         vm.prank(borrower);
         router.swap(order, address(cbbtc), address(usdc), 100_000e6, _pullData(borrower));
     }
@@ -230,7 +230,7 @@ contract Test2to4_Opcodes is Test {
 
         _pullAs(borrower, order, FACILITY_USDC); // draw everything
 
-        vm.expectRevert(abi.encodeWithSelector(ChronosOpcodes.OrderCovered.selector, orderHash));
+        vm.expectRevert(abi.encodeWithSelector(AlbaOpcodes.OrderCovered.selector, orderHash));
         vm.prank(borrower);
         router.swap(order, address(cbbtc), address(usdc), 1e6, _pullData(borrower));
     }

@@ -21,7 +21,7 @@ case "$step" in
     ;;
 
   deploy-trigger) # 2. trigger on Hedera testnet (dest addr = receiver as string)
-    forge create src/spike/ChronosTriggerSpike.sol:ChronosTriggerSpike \
+    forge create src/spike/AlbaTriggerSpike.sol:AlbaTriggerSpike \
       --rpc-url "$HEDERA_TESTNET_RPC" --private-key "$PRIVATE_KEY" --broadcast \
       --constructor-args "$AXELAR_GATEWAY_HEDERA" "$AXELAR_GAS_SERVICE_HEDERA" \
         "base-sepolia" "$SPIKE_RECEIVER_BASE_SEPOLIA"

@@ -10,7 +10,7 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {AlbaOrderBuilder} from "../src/AlbaOrderBuilder.sol";
 
 /// @notice Test 1 — the strategyHash trap. Ship a strategy to the OFFICIAL Aqua deployment
 /// on a pinned Base mainnet fork, then execute the derived order through TermRouter.
@@ -24,7 +24,7 @@ contract Test1_ShipExecuteRoundTrip is Test {
     uint256 constant PRICE_REF_CBBTC = 3e8; // taker side pricing reference (100k USDC per cbBTC)
 
     TermRouter router;
-    ChronosOrderBuilder builder;
+    AlbaOrderBuilder builder;
     TokenMock usdc; // mock loan token (official Aqua, mock assets)
     TokenMock cbbtc; // mock collateral-ish counter token
 
@@ -35,7 +35,7 @@ contract Test1_ShipExecuteRoundTrip is Test {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
 
         router = new TermRouter(address(AQUA), WETH, address(this));
-        builder = new ChronosOrderBuilder(address(AQUA));
+        builder = new AlbaOrderBuilder(address(AQUA));
         usdc = new TokenMock("Mock USDC", "USDC");
         cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
 

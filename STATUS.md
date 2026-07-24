@@ -20,7 +20,7 @@ RPCs: `https://testnet.hashio.io/api` · `https://sepolia.base.org`. Chain ids: 
 ### Item 2 — live trigger leg 🟢 MANUAL LEG EXECUTED; scheduled leg in flight
 
 - [x] Wallets funded; `SpikeReceiver` deployed Base Sepolia `0x8a3BDF1311504e2cf492382DcF6b3D6BE3a4c97F`
-- [x] `ChronosTriggerSpike` deployed Hedera testnet (same address), funded 30 HBAR
+- [x] `AlbaTriggerSpike` deployed Hedera testnet (same address), funded 30 HBAR
 - [x] **Manual dispatch EXECUTED end-to-end** — Hedera tx
       `0x80eca48ba7f61d89b6cf4bfb44bfd2c9bfaa68076d2b3381a97e6f464ae0e3bc` → Axelarscan
       status `executed` on base-sepolia. Gotcha captured: Hedera EVM denominates
@@ -51,7 +51,7 @@ Fork pinned to block 49,062,000; **official Aqua** `0x499943E74FB0cE105688beeE8E
 
 - ✅ swap-vm v1.0.1 dependency; its full suite 712/712; findings in `prep/FINDINGS.md`
 - ✅ Test 1: ship→execute round trip (strategyHash == orderHash by construction —
-  shipped strategy bytes ARE `abi.encode(order)`; single source of truth in `ChronosProgramBuilder`)
+  shipped strategy bytes ARE `abi.encode(order)`; single source of truth in `AlbaProgramBuilder`)
 - ✅ Tests 2–4: `_notBefore` (reverts pre-T in swap AND quote), `_onlyTaker` (skips check in
   static context), `_stopWhenCovered` (cumulative cap, remainder-exact last fill, `OrderCovered`
   halt, staticcall never mutates fill accounting)

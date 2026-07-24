@@ -1,6 +1,6 @@
 # Custom Opcodes Specification
 
-Router: `TermRouter is AquaSwapVMRouter, ChronosOpcodes`, overriding `_instructions()` to append these to the standard set. Each instruction receives the SwapVM `Context`: VM state (`isStaticContext`, `nextPC`, `programPtr`, `takerArgsPtr`), read-only `SwapQuery` (`orderHash`, `maker`, `taker`, `tokenIn`, `tokenOut`, `isExactIn`), and mutable `SwapRegisters` (`balanceIn/Out`, `amountIn/Out`, `amountNetPulled`).
+Router: `TermRouter is AquaSwapVMRouter, AlbaOpcodes`, overriding `_instructions()` to append these to the standard set. Each instruction receives the SwapVM `Context`: VM state (`isStaticContext`, `nextPC`, `programPtr`, `takerArgsPtr`), read-only `SwapQuery` (`orderHash`, `maker`, `taker`, `tokenIn`, `tokenOut`, `isExactIn`), and mutable `SwapRegisters` (`balanceIn/Out`, `amountIn/Out`, `amountNetPulled`).
 
 Before writing any of these: **read the existing invalidator instructions** (`_invalidateTokenIn1D` / `_invalidateTokenOut1D`) and reuse their per-orderHash storage pattern. Less code + stronger "composed with their primitives" story for judging.
 

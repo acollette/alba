@@ -11,11 +11,11 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {AlbaOrderBuilder} from "../src/AlbaOrderBuilder.sol";
 import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {AxelarSettlementExecutor} from "../src/AxelarSettlementExecutor.sol";
-import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
+import {AlbaProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @dev Stand-in for the Axelar gateway on the fork: approves every command so the executor's
 /// _execute path (source validation, settle, default fallback) can be driven end-to-end.
@@ -44,7 +44,7 @@ contract Test7_AxelarWiring is Test {
     string constant SOURCE_ADDR = "0xDEA1Re915";
 
     TermRouter router;
-    ChronosOrderBuilder builder;
+    AlbaOrderBuilder builder;
     MockV3Aggregator oracle;
     CollateralEscrow escrow;
     AxelarSettlementExecutor executor;
@@ -65,7 +65,7 @@ contract Test7_AxelarWiring is Test {
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
-        builder = new ChronosOrderBuilder(address(AQUA));
+        builder = new AlbaOrderBuilder(address(AQUA));
         oracle = new MockV3Aggregator(8, 100_000e8);
         gateway = new MockAxelarGateway();
         executor = new AxelarSettlementExecutor(address(gateway), router, SOURCE_CHAIN, SOURCE_ADDR);
@@ -83,7 +83,7 @@ contract Test7_AxelarWiring is Test {
         address[] memory tokens;
         uint256[] memory amounts;
         (facilityOrder, strategy, tokens, amounts) = builder.buildFacilityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: lender,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
@@ -115,7 +115,7 @@ contract Test7_AxelarWiring is Test {
         usdc.approve(address(AQUA), type(uint256).max);
         escrow.draw(bytes32(uint256(0xFAC)), DRAW_ID, DRAW1);
         (maturityOrder, strategy, tokens, amounts) = builder.buildMaturityLeg(
-            ChronosProgramBuilder.PullLegTerms({
+            AlbaProgramBuilder.PullLegTerms({
                 maker: borrower,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),

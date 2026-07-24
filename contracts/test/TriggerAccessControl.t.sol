@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 
-import {ChronosTriggerSpike} from "../src/spike/ChronosTriggerSpike.sol";
+import {AlbaTriggerSpike} from "../src/spike/AlbaTriggerSpike.sol";
 import {HSS_ADDRESS} from "../src/spike/IHederaScheduleService.sol";
 
 /// @dev Minimal Axelar stand-ins: `dispatch` only needs these two calls to not revert.
@@ -18,7 +18,7 @@ contract MockGasService {
     {}
 }
 
-/// @notice Locks down the access control added to ChronosTriggerSpike: only allowlisted
+/// @notice Locks down the access control added to AlbaTriggerSpike: only allowlisted
 /// callers may `dispatch`, gas is capped per call, and — critically — the self-call path
 /// (msg.sender == address(this)) that the Hedera schedule relies on is accepted.
 ///
@@ -26,7 +26,7 @@ contract MockGasService {
 /// Service presents as msg.sender — that is a network-runtime fact and still requires one
 /// testnet `scheduleDispatch` run to confirm end-to-end.
 contract TriggerAccessControl is Test {
-    ChronosTriggerSpike trigger;
+    AlbaTriggerSpike trigger;
     address owner = makeAddr("owner");
     address stranger = makeAddr("stranger");
 
@@ -34,7 +34,7 @@ contract TriggerAccessControl is Test {
         address gw = address(new MockGateway());
         address gs = address(new MockGasService());
         vm.prank(owner); // must be the call that immediately precedes the CREATE
-        trigger = new ChronosTriggerSpike(gw, gs, "base", "0xReceiver");
+        trigger = new AlbaTriggerSpike(gw, gs, "base", "0xReceiver");
         vm.deal(address(trigger), 100e8); // HBAR for the gas-service path
     }
 
@@ -50,7 +50,7 @@ contract TriggerAccessControl is Test {
     // ---- who may dispatch ----
 
     function test_StrangerCannotDispatch() public {
-        vm.expectRevert(abi.encodeWithSelector(ChronosTriggerSpike.NotDispatcher.selector, stranger));
+        vm.expectRevert(abi.encodeWithSelector(AlbaTriggerSpike.NotDispatcher.selector, stranger));
         vm.prank(stranger);
         trigger.dispatch(1, 1, "SETTLE", 0);
     }
@@ -70,7 +70,7 @@ contract TriggerAccessControl is Test {
     // ---- gas cap ----
 
     function test_GasCapReverts() public {
-        vm.expectRevert(abi.encodeWithSelector(ChronosTriggerSpike.GasCapExceeded.selector, 5e8 + 1, 5e8));
+        vm.expectRevert(abi.encodeWithSelector(AlbaTriggerSpike.GasCapExceeded.selector, 5e8 + 1, 5e8));
         vm.prank(owner);
         trigger.dispatch(1, 1, "SETTLE", 5e8 + 1);
     }
@@ -85,7 +85,7 @@ contract TriggerAccessControl is Test {
     // ---- owner-only admin ----
 
     function test_SetDispatcherOnlyOwner() public {
-        vm.expectRevert(ChronosTriggerSpike.NotOwner.selector);
+        vm.expectRevert(AlbaTriggerSpike.NotOwner.selector);
         vm.prank(stranger);
         trigger.setDispatcher(stranger, true);
     }
