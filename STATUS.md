@@ -71,6 +71,36 @@ Fork pinned to block 49,062,000; **official Aqua** `0x499943E74FB0cE105688beeE8E
 3. **Auction is signature-mode via ERC-1271** (escrow signs its own armed orders): Aqua push
    would inflate bid-side pricing and break the decay curve. Collateral capped by bounded allowance.
 
+## LIVE PRODUCT SETTLEMENT ✅ — full loop on real networks, real contracts
+
+The spike receiver is retired: the live GMP payload now drives the REAL
+`AxelarSettlementExecutor`, which settled an actual Aqua maturity leg on Base Sepolia.
+
+**What happened, end to end (no human, no keeper, after the schedule was set):**
+1. Hedera schedule `0.0.9734303` executed BY THE NETWORK at exactly its expiry second
+   (`1784923518.097`) → trigger `0x5828ca46dffc4145B59F01A34FA1f4d51C7Ac1CE` dispatched
+   payload `(facilityId 1, drawId 1, epoch 0, "SETTLE")` via Axelar (tx
+   `0x8a19712c465002745a2d898e35c1d7ef8dd5f713912cb7bd5b6f419ad78a4c4f` created it).
+2. Axelar GMP delivered to `AxelarSettlementExecutor`
+   `0x7EdAe2265A74922397a1324539C1c12AD5D1a29A` (source chain+address validated).
+3. Executor pulled the 102,021.917808 USDC repayment via **Aqua — zero signatures** —
+   straight to the lender and released the 1.3 cbBTC collateral:
+   `Settled` at block 44,577,701, tx
+   `0x89dab01819b18526760fb0099e69c17f88f74029eea5146af08c5a02fbe3d495`;
+   draw state = RELEASED.
+
+**Live Base Sepolia stack** (Aqua = unmodified deployment `0x29C10C31eB844D038A0Dc858997f8ADea1da3270`
+— no official testnet Aqua exists; the judged 1inch demo runs on the Base mainnet fork
+against the official `0x499943E74FB0cE105688beeE8Ef2ABec5D936d31`):
+TermRouter `0x5828ca46dffc4145B59F01A34FA1f4d51C7Ac1CE` · Builder `0x95e051cB41cee5cCe4CC0c7D04121256eC7B86Ca`
+· Executor `0x7EdAe2265A74922397a1324539C1c12AD5D1a29A` · Escrow `0x14944f6F0CF45A7501dD4C7a8705f7f8f7BD0485`
+· USDC `0x13e88500CF7e76F59dF8fA5670C5eFA901a79bAB` · cbBTC `0xcECfd1522166deD2420A3935d67f2371923779E7`
+
+**EIP-170 note:** live deploy exposed TermRouter at 36KB (fork tests don't enforce size)
+→ split `ChronosOrderBuilder` out; shared `ChronosInstructionSet` mixin keeps the opcode
+table single-sourced; unused instruction families point at `_notInstruction` (upstream
+AquaOpcodes pattern). Router 18.5KB. Suite still 21/21.
+
 ## END-OF-DAY-1 GATE ✅ PASSED — REAL PATH, NO FALLBACK
 
 - Schedule fires live: ✅ Hedera network executed the schedule itself; message delivered
