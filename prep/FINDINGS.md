@@ -72,3 +72,20 @@ taker→maker via push-balance check or `useTransferFromAndAquaPush`.
 swap-vm is `LicenseRef-Degensoft-SwapVM-1.1` (source-available, not OSI). Inheriting
 `AquaSwapVMRouter` in our redeployment is explicitly allowed by the 1inch brief; confirm
 distribution terms with the 1inch team in person before choosing contracts-repo license.
+
+## As-built deviations from the planning pack (decided during Tests 2-4)
+
+1. **Aqua balances are LIVE** — every fill moves them, so `_limitSwap1D` priced off Aqua
+   balances drifts like an AMM. A fixed rate across partial fills cannot come from VM
+   pricing. → Draw and maturity legs are **zero-amountIn exact-out pulls**
+   (`allowZeroAmountIn`, no pricing instruction; `SwapVM._transferIn` skips the taker
+   transfer at amountIn == 0). Zero-coupon economics (repayment = drawn × (1+r·t)) are
+   computed in ChronosProgramBuilder when sizing shipped amounts. This *strengthens* the
+   story: settlement really is "a machine pulls a scheduled amount from a ledger".
+2. **Clamp-don't-revert is structurally impossible for the taker-specified register** —
+   `TakerTraits.validate` pins it to the request (quote validates identically). As built:
+   overfills revert with `StopWhenCoveredExceeded(requested, remaining)`; the last filler
+   reads `coveredAmount` (public) and takes exactly the remainder. The clamp branch exists
+   for derived-amountOut exact-in legs (kept for the auction analysis in item 9).
+3. `_stopWhenCovered` on the maturity leg doubles as **double-settlement protection**
+   (second pull → `OrderCovered`).

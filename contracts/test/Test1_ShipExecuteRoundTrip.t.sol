@@ -10,7 +10,6 @@ import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
-import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @notice Test 1 — the strategyHash trap. Ship a strategy to the OFFICIAL Aqua deployment
 /// on a pinned Base mainnet fork, then execute the derived order through TermRouter.
@@ -42,15 +41,12 @@ contract Test1_ShipExecuteRoundTrip is Test {
         usdc.approve(address(AQUA), type(uint256).max);
     }
 
-    function _leg() internal view returns (ChronosProgramBuilder.AquaLegTerms memory) {
-        return ChronosProgramBuilder.AquaLegTerms({
-            maker: lender,
-            takerToken: address(cbbtc),
-            makerToken: address(usdc),
-            takerTokenBalance: PRICE_REF_CBBTC,
-            makerTokenBalance: LENDER_USDC,
-            salt: 1
-        });
+    function _buildLeg()
+        internal
+        view
+        returns (ISwapVM.Order memory order, bytes memory strategy, address[] memory tokens, uint256[] memory amounts)
+    {
+        return router.buildAquaLimitLeg(lender, address(cbbtc), address(usdc), PRICE_REF_CBBTC, LENDER_USDC, 1);
     }
 
     function _takerData() internal view returns (bytes memory) {
@@ -81,7 +77,7 @@ contract Test1_ShipExecuteRoundTrip is Test {
 
     function test_ShipThenExecute_RoundTrip() public {
         (ISwapVM.Order memory order, bytes memory strategy, address[] memory tokens, uint256[] memory amounts) =
-            router.buildAquaLimitLeg(_leg());
+            _buildLeg();
 
         // Ship: strategyHash must equal the router's orderHash — THE round-trip assertion
         vm.prank(lender);
@@ -110,7 +106,7 @@ contract Test1_ShipExecuteRoundTrip is Test {
 
     function test_Quote_MatchesSwap_AndIsStatic() public {
         (ISwapVM.Order memory order, bytes memory strategy, address[] memory tokens, uint256[] memory amounts) =
-            router.buildAquaLimitLeg(_leg());
+            _buildLeg();
         vm.prank(lender);
         AQUA.ship(address(router), strategy, tokens, amounts);
 
@@ -122,7 +118,7 @@ contract Test1_ShipExecuteRoundTrip is Test {
     }
 
     function test_UnshippedOrder_Reverts() public {
-        (ISwapVM.Order memory order,,,) = router.buildAquaLimitLeg(_leg());
+        (ISwapVM.Order memory order,,,) = _buildLeg();
         cbbtc.mint(borrower, 1e8);
         vm.prank(borrower);
         cbbtc.approve(address(router), 1e8);
