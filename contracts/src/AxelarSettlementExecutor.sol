@@ -24,6 +24,7 @@ contract AxelarSettlementExecutor is AxelarExecutable {
     error OnlyOrderMaker(address caller, address maker);
     error EscrowAlreadySet();
     error UnknownAction(string action);
+    error InsufficientCheckGas(uint256 provided, uint256 required);
 
     event SettlementRegistered(bytes32 indexed drawId, address indexed borrower);
     event Settled(bytes32 indexed drawId, uint256 amountPulled, address lender);
@@ -38,6 +39,9 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         bool exists;
         bool executed;
     }
+
+    /// @notice Floor for the CHECK path: full-cure = liquidate + Aqua pull + transfers
+    uint256 public constant MIN_CHECK_GAS = 900_000;
 
     TermRouter public immutable ROUTER;
     bytes32 public immutable SOURCE_CHAIN_HASH; // e.g. keccak("hedera")
@@ -106,6 +110,10 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         if (actionHash == keccak256("SETTLE")) {
             _settle(drawId);
         } else if (actionHash == keccak256("CHECK")) {
+            // The cure path needs real gas. A relayer that under-allocates must fail LOUDLY
+            // (retryable) — otherwise the try/catch swallows the inner out-of-gas and a
+            // breached position reads as "healthy". Discovered live; see STATUS.md.
+            require(gasleft() >= MIN_CHECK_GAS, InsufficientCheckGas(gasleft(), MIN_CHECK_GAS));
             // Sentinel tick: intervene only on a real breach; healthy checks are no-ops
             try this.attemptLiquidate(drawId) {
                 emit HealthChecked(drawId, true);
