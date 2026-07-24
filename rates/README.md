@@ -53,5 +53,6 @@ GRAPH_API_KEY=... node src/server.mjs
 All responses are computed from **live endpoints at request time** (90s cache); nothing is
 mocked or checkpointed.
 
-Part of the Alba project (ETHGlobal Lisbon 2026) — contracts repo:
-[acollette/alba](https://github.com/acollette/alba). MIT.
+Part of the Alba project (ETHGlobal Lisbon 2026) — lives at `rates/` in the
+[acollette/alba](https://github.com/acollette/alba) monorepo during the event; split to a
+standalone repo at submission (`git subtree split --prefix=rates`). MIT.
