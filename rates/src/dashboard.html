@@ -1,12 +1,200 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8" />
-<title>alba-rates</title>
-<body style="font-family: ui-monospace, monospace; padding: 2rem">
-  <h2>alba-rates</h2>
-  <p>Dashboard chart lands here. Meanwhile:</p>
-  <ul>
-    <li><a href="/api/rates">/api/rates</a> — everything</li>
-    <li><a href="/api/floating-band">/api/floating-band</a> — one Messari query, four Base protocols</li>
-    <li><a href="/api/midnight-curve">/api/midnight-curve</a> — live Morpho Midnight cbBTC/USDC fixed curve</li>
-  </ul>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Alba — live rates</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page: #f9f9f7;
+    --ink-1: #0b0b0b; --ink-2: #52514e; --ink-3: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --fixed: #2a78d6;      /* series 1: Midnight fixed curve */
+    --offer: #eb6834;      /* emphasis: the Alba facility offer */
+    --band: #898781;       /* context band: neutral, not a series */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page: #0d0d0d;
+      --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-3: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+      --fixed: #3987e5; --offer: #d95926; --band: #898781;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page: #0d0d0d;
+    --ink-1: #ffffff; --ink-2: #c3c2b7; --ink-3: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --fixed: #3987e5; --offer: #d95926; --band: #898781;
+  }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .viz-root { background: var(--page); color: var(--ink-1); min-height: 100vh; padding: 28px clamp(16px, 4vw, 48px); box-sizing: border-box; }
+  header h1 { font-size: 18px; margin: 0 0 2px; }
+  header p { margin: 0 0 20px; color: var(--ink-2); font-size: 13px; }
+  .tiles { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 0 1 auto; }
+  .tile .label { font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .tile .value { font-size: 28px; font-weight: 600; }
+  .tile .sub { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .card { background: var(--surface-1); border: 1px solid var(--ring); border-radius: 10px; padding: 18px; }
+  .card h2 { font-size: 14px; margin: 0 0 2px; }
+  .card .sub { font-size: 12px; color: var(--ink-2); margin-bottom: 10px; }
+  .legend { display: flex; gap: 18px; font-size: 12px; color: var(--ink-2); margin: 8px 0 4px; flex-wrap: wrap; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; }
+  .key i { display: inline-block; }
+  .key .line { width: 18px; height: 2px; border-radius: 1px; }
+  .key .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .key .wash { width: 18px; height: 10px; border-radius: 2px; opacity: 0.35; }
+  .chart-wrap { position: relative; overflow-x: auto; }
+  .tooltip { position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--ink-1); box-shadow: 0 4px 14px rgba(0,0,0,0.12); display: none; white-space: nowrap; }
+  .tooltip .t-label { color: var(--ink-2); }
+  table { border-collapse: collapse; font-size: 13px; margin-top: 18px; width: 100%; }
+  caption { text-align: left; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+  th { text-align: left; color: var(--ink-2); font-weight: 500; border-bottom: 1px solid var(--grid); padding: 6px 14px 6px 0; }
+  td { border-bottom: 1px solid var(--grid); padding: 6px 14px 6px 0; font-variant-numeric: tabular-nums; }
+  .asof { font-size: 12px; color: var(--ink-3); margin-top: 14px; }
+  svg text { font-family: inherit; }
+</style>
+<body>
+<div class="viz-root">
+  <header>
+    <h1>Alba — live pricing context</h1>
+    <p>Fixed benchmark: Morpho Midnight cbBTC/USDC order books · Floating band: one Messari-standardized query, four Base protocols, via The Graph gateway</p>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card">
+    <h2>USDC term structure — fixed curve vs floating band</h2>
+    <div class="sub">Implied best-ask APR by maturity (Midnight, live) · variable borrow APR range (Aave v3 · Compound v3 · Moonwell · Seamless, live)</div>
+    <div class="legend" id="legend"></div>
+    <div class="chart-wrap" id="wrap">
+      <svg id="chart" role="img" aria-label="Term structure: Midnight fixed curve, floating borrow band, and the Alba facility offer"></svg>
+      <div class="tooltip" id="tip"></div>
+    </div>
+    <table id="table"></table>
+    <div class="asof" id="asof"></div>
+  </div>
+</div>
+
+<script>
+const OFFER_PCT = Number(new URLSearchParams(location.search).get("offer") ?? 8.20);
+const OFFER_DAYS = Number(new URLSearchParams(location.search).get("tenor") ?? 90);
+const css = (v) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(v).trim();
+
+async function main() {
+  const r = await fetch("/api/rates").then((x) => x.json());
+  const curve = r.fixed.curve;
+  const band = r.floating.band;
+  const protocols = r.floating.protocols.filter((p) => p.borrowApr != null);
+  const bench = r.fixed.benchmark90d;
+
+  // ---- stat tiles
+  const tiles = [
+    { label: "Midnight " + OFFER_DAYS + "d benchmark", value: fmt(bench) + "%", sub: "interpolated from live order books" },
+    { label: "Floating borrow band", value: fmt(band.borrowMin) + "–" + fmt(band.borrowMax) + "%", sub: protocols.map((p) => p.protocol).join(" · ") },
+    { label: "This facility", value: fmt(OFFER_PCT) + "%", sub: "Midnight " + OFFER_DAYS + "d " + spread(OFFER_PCT, bench) },
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map((t) =>
+    `<div class="tile"><div class="label">${t.label}</div><div class="value">${t.value}</div><div class="sub">${t.sub}</div></div>`).join("");
+
+  // ---- legend (2 series + context band)
+  document.getElementById("legend").innerHTML =
+    `<span class="key"><i class="line" style="background:${css("--fixed")}"></i>Midnight fixed curve</span>` +
+    `<span class="key"><i class="dot" style="background:${css("--offer")}"></i>Alba facility offer</span>` +
+    `<span class="key"><i class="wash" style="background:${css("--band")}"></i>Floating borrow band (4 protocols)</span>`;
+
+  drawChart(curve, band, protocols);
+
+  // ---- table view (the always-available identity/value channel)
+  const rows = [
+    ...curve.map((c) => [`Midnight fixed · ${c.maturityDate}`, c.days + "d", fmt(c.aprPct) + "%"]),
+    ...protocols.map((p) => [`${p.protocol} variable borrow`, "open", fmt(p.borrowApr) + "%"]),
+    [`Alba facility offer`, OFFER_DAYS + "d", fmt(OFFER_PCT) + "%"],
+  ];
+  document.getElementById("table").innerHTML =
+    `<caption>All plotted values</caption><tr><th>Series</th><th>Tenor</th><th>APR</th></tr>` +
+    rows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+  document.getElementById("asof").textContent = "Live at " + r.asOf + " · 90s cache · nothing mocked";
+}
+
+function drawChart(curve, band, protocols) {
+  const W = Math.max(640, Math.min(document.getElementById("wrap").clientWidth, 980)), H = 300;
+  const M = { l: 44, r: 150, t: 16, b: 34 };
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+  const xMax = Math.max(OFFER_DAYS, ...curve.map((c) => c.days)) + 15;
+  const yMax = Math.ceil(Math.max(band.borrowMax, OFFER_PCT, ...curve.map((c) => c.aprPct)) + 1);
+  const x = (d) => M.l + (d / xMax) * iw;
+  const y = (v) => M.t + ih - (v / yMax) * ih;
+
+  let s = "";
+  // gridlines + y ticks (clean integers)
+  for (let v = 0; v <= yMax; v += Math.max(1, Math.round(yMax / 6))) {
+    s += `<line x1="${M.l}" y1="${y(v)}" x2="${W - M.r}" y2="${y(v)}" stroke="${css("--grid")}" stroke-width="1"/>`;
+    s += `<text x="${M.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="${css("--ink-3")}" style="font-variant-numeric:tabular-nums">${v}%</text>`;
+  }
+  // x ticks
+  for (const d of [0, 30, 60, 90, 120].filter((d) => d <= xMax)) {
+    s += `<text x="${x(d)}" y="${H - 10}" text-anchor="middle" font-size="11" fill="${css("--ink-3")}">${d}d</text>`;
+  }
+  // baseline
+  s += `<line x1="${M.l}" y1="${y(0)}" x2="${W - M.r}" y2="${y(0)}" stroke="${css("--axis")}" stroke-width="1"/>`;
+
+  // floating band: neutral wash across the tenor axis (variable rates have no term)
+  s += `<rect x="${M.l}" y="${y(band.borrowMax)}" width="${iw}" height="${y(band.borrowMin) - y(band.borrowMax)}" fill="${css("--band")}" opacity="0.13"/>`;
+  s += `<text x="${W - M.r + 8}" y="${(y(band.borrowMin) + y(band.borrowMax)) / 2 + 4}" font-size="11" fill="${css("--ink-2")}">Floating band ${fmt(band.borrowMin)}–${fmt(band.borrowMax)}%</text>`;
+
+  // Midnight fixed curve: 10% wash under the line, 2px line, ≥8px ringed markers
+  const pts = curve.map((c) => [x(c.days), y(c.aprPct)]);
+  if (pts.length) {
+    const line = pts.map((p, i) => (i ? "L" : "M") + p[0] + " " + p[1]).join(" ");
+    s += `<path d="${line} L ${pts.at(-1)[0]} ${y(0)} L ${pts[0][0]} ${y(0)} Z" fill="${css("--fixed")}" opacity="0.10"/>`;
+    s += `<path d="${line}" fill="none" stroke="${css("--fixed")}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    for (const [i, p] of pts.entries()) {
+      s += `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="${css("--surface-1")}"/>`; // 2px surface ring
+      s += `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${css("--fixed")}" data-i="${i}" class="pt"/>`;
+    }
+    // direct end-label for the subject series
+    s += `<text x="${pts.at(-1)[0] + 10}" y="${pts.at(-1)[1] - 8}" font-size="11" fill="${css("--ink-2")}">Midnight fixed ${fmt(curve.at(-1).aprPct)}%</text>`;
+  }
+
+  // the point of the chart: the facility offer (emphasis mark + direct label)
+  s += `<circle cx="${x(OFFER_DAYS)}" cy="${y(OFFER_PCT)}" r="7" fill="${css("--surface-1")}"/>`;
+  s += `<circle cx="${x(OFFER_DAYS)}" cy="${y(OFFER_PCT)}" r="5" fill="${css("--offer")}" class="pt" data-offer="1"/>`;
+  s += `<text x="${x(OFFER_DAYS)}" y="${y(OFFER_PCT) - 12}" text-anchor="middle" font-size="11" fill="${css("--ink-1")}" font-weight="600">This facility ${fmt(OFFER_PCT)}%</text>`;
+
+  const svg = document.getElementById("chart");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.innerHTML = s;
+
+  // hover: generous hit targets + tooltip
+  const tip = document.getElementById("tip");
+  svg.addEventListener("mousemove", (e) => {
+    const box = svg.getBoundingClientRect();
+    const mx = e.clientX - box.left, my = e.clientY - box.top;
+    let best = null, bd = 20 * 20;
+    curve.forEach((c, i) => {
+      const dx = mx - x(c.days), dy = my - y(c.aprPct);
+      if (dx * dx + dy * dy < bd) { bd = dx * dx + dy * dy; best = { t: `Midnight ${c.days}d (${c.maturityDate})`, v: fmt(c.aprPct) + "% · zc price " + c.zeroCouponPrice, px: x(c.days), py: y(c.aprPct) }; }
+    });
+    const dxo = mx - x(OFFER_DAYS), dyo = my - y(OFFER_PCT);
+    if (dxo * dxo + dyo * dyo < bd) best = { t: "Alba facility · " + OFFER_DAYS + "d", v: fmt(OFFER_PCT) + "%", px: x(OFFER_DAYS), py: y(OFFER_PCT) };
+    if (best) {
+      tip.style.display = "block";
+      tip.innerHTML = `<div class="t-label">${best.t}</div><div><b>${best.v}</b></div>`;
+      tip.style.left = Math.min(best.px + 12, W - 190) + "px";
+      tip.style.top = (best.py - 14) + "px";
+    } else tip.style.display = "none";
+  });
+  svg.addEventListener("mouseleave", () => (tip.style.display = "none"));
+}
+
+const fmt = (v) => (v == null ? "—" : v.toFixed(2));
+const spread = (o, b) => (b == null ? "" : (o >= b ? "+" : "−") + Math.abs(Math.round((o - b) * 100)) + " bps");
+main().catch((e) => { document.getElementById("tiles").innerHTML = `<div class="tile"><div class="label">error</div><div class="sub">${e.message}</div></div>`; });
+</script>
 </body>
+</html>
