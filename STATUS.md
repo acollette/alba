@@ -71,35 +71,53 @@ Fork pinned to block 49,062,000; **official Aqua** `0x499943E74FB0cE105688beeE8E
 3. **Auction is signature-mode via ERC-1271** (escrow signs its own armed orders): Aqua push
    would inflate bid-side pricing and break the decay curve. Collateral capped by bounded allowance.
 
-## LIVE PRODUCT SETTLEMENT ✅ — full loop on real networks, real contracts
+### Post-gate hardening (still Day 1; suite now 22/22)
+4. **Atomic collateralized draws** — facility leg carries `_onlyTaker(escrow)`; the ONLY
+   way to draw is `escrow.draw()`: pro-rata collateral in + zero-in facility pull out, one
+   tx, proceeds to the borrower. Closed a real gap (uncollateralized direct draws); test
+   asserts the direct path reverts `UnauthorizedTaker`. No upfront collateral ever —
+   undrawn capacity costs the borrower nothing.
+5. **Oracle-marked collateral** — `collateralForDraw = amount × ratioBps / freshPrice`
+   (staleness + positivity guarded, constants immutable); `armAuction` marks its 105%
+   start premium to the oracle AT ARM TIME (the registered `startBidRef` was price-stale).
+   Honest token decimals in tests (USDC 6 / cbBTC 8); mock Chainlink-shaped feed on
+   testnet (no cbBTC/USD feed on Base Sepolia); real Chainlink on Base mainnet is the
+   production wiring.
+6. Auction disarm pinned by tests: covered → `OrderCovered`; post-sweep → `BadSignature`
+   at the signature layer + allowance zeroed + armed flag cleared.
 
-The spike receiver is retired: the live GMP payload now drives the REAL
-`AxelarSettlementExecutor`, which settled an actual Aqua maturity leg on Base Sepolia.
+## LIVE PRODUCT SETTLEMENT ✅ ×3 — full loop on real networks, real contracts
 
-**What happened, end to end (no human, no keeper, after the schedule was set):**
-1. Hedera schedule `0.0.9734303` executed BY THE NETWORK at exactly its expiry second
-   (`1784923518.097`) → trigger `0x5828ca46dffc4145B59F01A34FA1f4d51C7Ac1CE` dispatched
-   payload `(facilityId 1, drawId 1, epoch 0, "SETTLE")` via Axelar (tx
-   `0x8a19712c465002745a2d898e35c1d7ef8dd5f713912cb7bd5b6f419ad78a4c4f` created it).
-2. Axelar GMP delivered to `AxelarSettlementExecutor`
-   `0x7EdAe2265A74922397a1324539C1c12AD5D1a29A` (source chain+address validated).
-3. Executor pulled the 102,021.917808 USDC repayment via **Aqua — zero signatures** —
-   straight to the lender and released the 1.3 cbBTC collateral:
-   `Settled` at block 44,577,701, tx
-   `0x89dab01819b18526760fb0099e69c17f88f74029eea5146af08c5a02fbe3d495`;
-   draw state = RELEASED.
+The spike receiver is retired: the live GMP payload drives the REAL
+`AxelarSettlementExecutor`, which settles actual Aqua maturity legs on Base Sepolia.
+The loop has now run **three times**, once per iteration of the stack — each time fully
+autonomous after the schedule was set (no human, no keeper, no bot):
 
-**Live Base Sepolia stack** (Aqua = unmodified deployment `0x29C10C31eB844D038A0Dc858997f8ADea1da3270`
-— no official testnet Aqua exists; the judged 1inch demo runs on the Base mainnet fork
-against the official `0x499943E74FB0cE105688beeE8Ef2ABec5D936d31`):
-TermRouter `0x5828ca46dffc4145B59F01A34FA1f4d51C7Ac1CE` · Builder `0x95e051cB41cee5cCe4CC0c7D04121256eC7B86Ca`
-· Executor `0x7EdAe2265A74922397a1324539C1c12AD5D1a29A` · Escrow `0x14944f6F0CF45A7501dD4C7a8705f7f8f7BD0485`
-· USDC `0x13e88500CF7e76F59dF8fA5670C5eFA901a79bAB` · cbBTC `0xcECfd1522166deD2420A3935d67f2371923779E7`
+| Run | Stack | Hedera schedule (network-executed) | Settled on Base Sepolia |
+|---|---|---|---|
+| v1 | first wiring | `0.0.9734303` @ `1784923518.097` | block 44,577,701 · `0x89dab018...be3d495` |
+| v2 | atomic draws | (schedule fired on v2 trigger) | block 44,578,399 · `0xf4bc86f3...bce9a1f` |
+| v3 | + oracle marking | `0.0.9734648` @ `1784925648.266` | block 44,578,764 · `0x842b2e6e...24384ca2` |
 
-**EIP-170 note:** live deploy exposed TermRouter at 36KB (fork tests don't enforce size)
-→ split `ChronosOrderBuilder` out; shared `ChronosInstructionSet` mixin keeps the opcode
-table single-sourced; unused instruction families point at `_notInstruction` (upstream
-AquaOpcodes pattern). Router 18.5KB. Suite still 21/21.
+Each run: schedule executed by the Hedera network at exactly its expiry second → trigger
+dispatched `(facilityId, drawId, epoch, "SETTLE")` via Axelar GMP → executor validated the
+source, pulled the 102,021.917808 USDC repayment via **Aqua — zero signatures** — straight
+to the lender, and released the collateral (draw state RELEASED). In v3 the draw itself
+had been sized by the on-chain oracle through `escrow.draw()` (atomic collateral+draw).
+
+**Current live Base Sepolia stack (v3)** (Aqua = unmodified deployment
+`0x29C10C31eB844D038A0Dc858997f8ADea1da3270` — no official testnet Aqua exists; the judged
+1inch demo runs on the Base mainnet fork against the official
+`0x499943E74FB0cE105688beeE8Ef2ABec5D936d31`):
+TermRouter `0xF6Ad8045FdD4A07c2B6f36E9b5043d13a86598a7` · Builder `0xc9E8e751b8352287116d8F41665923d1775E1E3B`
+· Executor `0xE31aDC4aE42aC04A0E8C88337F5Fb79fDF1bb0b7` · Escrow `0x8BbE713f6940434f809a87Fb37B6818dC1Abb410`
+· Oracle `0xB6C296EDDBc0872Ff746DD88443cbf9160393645` · USDC `0x859199F7e042127D8e476c5BA5927B48b7c425f1`
+· cbBTC `0x95745b9880f33f321e49063cc142465f81597dA4` · Hedera trigger `0xd4589b1a5d2Ed7259a1a85C6d98DF33f55f7e6FC`
+
+**Ops notes:** EIP-170 forced the router/builder split (fork tests don't enforce code
+size; router now 18.5KB). Hedera EVM `msg.value` is tinybars (8 dec) though the RPC layer
+is 18-dec. HSS rejects byte-identical duplicate schedules (built-in replay safety —
+mention to Hedera judges).
 
 ## END-OF-DAY-1 GATE ✅ PASSED — REAL PATH, NO FALLBACK
 
