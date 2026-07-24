@@ -26,7 +26,7 @@ contract LiveWiring is Script {
 
     uint256 constant FACILITY = 300_000e6;
     uint256 constant DRAW1 = 100_000e6;
-    uint256 constant COLLAT1 = 1.3e8;
+    uint256 constant COLLAT1 = 1.5e8;
     uint256 constant RATE_BPS = 820;
 
     function run() external {
@@ -66,7 +66,7 @@ contract LiveWiring is Script {
         );
         aqua.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, me, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
+            bytes32(uint256(0xFAC)), facilityOrder, me, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 15_000
         );
 
         // Atomic collateralized draw: collateral in, cash out, one tx (borrower = me)

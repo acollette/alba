@@ -40,7 +40,7 @@ No project code before the hackathon (qualification), but throwaway experiments 
 
 **Hours 1–4: frontend.**
 - Facility card (publish), accept/draw flow, position timeline, "300k committed · 150k drawn · 150k available" facility view.
-- Ruthlessly static: fixed 90d term, fixed 130% collateral, one facility, two wallets. Rate field is the only input.
+- Ruthlessly static: fixed 90d term, fixed 150% collateral (model-sized), one facility, two wallets. Rate field is the only input.
 
 **Hours 5–7: rates layer (isolated, safe while tired).**
 - Midnight live curve reader (P5 script → small service/route) → "Midnight 90d: x% · this offer: +z bps" in the card.

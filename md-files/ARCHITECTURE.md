@@ -32,7 +32,7 @@ Frontend (Next.js) + services/rates (Graph standardized-lending query + Midnight
 **Facility (flagship).** Lender publishes committed USDC facility (e.g. 300k) against cbBTC collateral at a fixed rate, fixed per-draw term. A **term loan is a facility drawn once** — one product, two stories.
 
 - **Open/draw leg:** static-balance SwapVM order, Aqua mode. Each draw = partial fill. `_stopWhenCovered(facilitySize)` caps cumulative draws.
-- **Per draw:** pro-rata cbBTC locks in `CollateralEscrow` (130%); a maturity leg arms; `DealRegistry` creates a Hedera scheduled tx for `now + term`.
+- **Per draw:** pro-rata cbBTC locks in `CollateralEscrow` (150%, model-sized — see PRICING.md); a maturity leg arms; `DealRegistry` creates a Hedera scheduled tx for `now + term`.
 - **Maturity leg:** SwapVM order pulling `drawn × (1 + rate·term)` USDC from borrower via Aqua. Gated by `_notBefore(T)` and `_onlyTaker(executor)`. Zero-coupon: no per-block accrual; yield realized atomically at settlement.
 - **Default path:** repayment pull reverts → same tx arms the pre-registered Dutch auction program. Escrow acts as Aqua maker for cbBTC; price starts ~105% of oracle and decays; permissionless fillers (existing Aqua solver network) fill partially; `_stopWhenCovered(debt)` halts sales the moment the lender is made whole; surplus cbBTC reclaimable by borrower. Decay is floored (~85% of oracle) — never race to zero.
 
@@ -45,7 +45,7 @@ Frontend (Next.js) + services/rates (Graph standardized-lending query + Midnight
 See `docs/OPCODES.md`. Three instructions: `_notBefore`, `_onlyTaker`, `_stopWhenCovered`.
 
 ### CollateralEscrow.sol
-- `lockFor(facilityId, drawId, amount)` — pulls cbBTC from borrower at draw time.
+- `draw(facilityId, drawId, amount)` — atomic: pulls oracle-sized collateral from the borrower AND executes the facility pull, one tx.
 - `armAuction(drawId)` — callable only by `AxelarSettlementExecutor` after a failed repayment pull; ships auction pull-rights to Aqua (`aqua.ship(termRouter, auctionStrategy, [cbBTC], [amount])`).
 - `release(drawId)` — returns collateral on successful settlement / surplus after auction covers debt.
 - **Invariant: single-claim collateral.** Escrow never ships rights to more than one strategy per draw; auction rights ship only post-default-confirmation. No productive-collateral rehypothecation (V2: yield-bearing ERC-4626 wrappers with 140% haircut instead).
@@ -77,7 +77,7 @@ Thin, deliberately. Canonical record: facility terms, parties, draws, states (AC
 
 ## Trust model / known cuts (state these proactively)
 
-- **Maturity-only collateral checks**, conservatively sized (130%, auction floor 115%). Continuous margining + Graph-based sentinel = roadmap. Scope cut, not quality cut — partial liquidation via `_stopWhenCovered` is *better* than fixed-chunk liquidations in production protocols.
+- **Maturity-only collateral checks**, model-sized (150% — the gap-risk put priced in PRICING.md; auction floor ~85% of oracle). Continuous margining + Graph-based sentinel = roadmap. Scope cut, not quality cut — partial liquidation via `_stopWhenCovered` is *better* than fixed-chunk liquidations in production protocols.
 - **No secondary market**, but positions are one ERC-721 wrapper from transferable (receiver field). Item 8; strongest scaling slide.
 - **Oracle:** Chainlink cbBTC/USD on Base for auction start price. Single oracle, acknowledged.
 - **Fee design principle (stolen from Midnight):** caps in code — settlement bps + liquidation fee constants, immutable. "Infrastructure that can't reprice you is infrastructure a treasurer can underwrite."

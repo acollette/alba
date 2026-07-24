@@ -45,9 +45,13 @@ GRAPH_API_KEY=... node src/server.mjs
 ```
 
 - `GET /api/rates` — everything (used by the Alba frontend)
-- `GET /api/floating-band` — per-protocol variable USDC borrow/supply APRs + min/max band
-- `GET /api/midnight-curve` — maturity, days, implied APR, zero-coupon price per point,
-  plus a 90d interpolation (the default Alba draw tenor)
+- `GET /api/floating-band` — per-protocol APRs + the borrow-weighted composite
+  (venues ≥ $1M borrow; SOFR-style discipline)
+- `GET /api/midnight-curve` — depth-filtered, $25k-clip executable curve + labeled
+  log-DF interpolation / flat-forward extrapolation for arbitrary tenors
+- `GET /api/quote?tenor=90&ratioBps=15000` — the desk build-up: benchmark + gap-risk
+  put (Black–Scholes on the collateral, maturity-only margining) + liquidity premium.
+  Full methodology: `../md-files/PRICING.md`
 - `GET /` — dashboard
 
 All responses are computed from **live endpoints at request time** (90s cache); nothing is

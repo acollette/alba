@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fetchFloatingBand } from "./graph.mjs";
 import { fetchMidnightCurve } from "./midnight.mjs";
+import { quoteFacilityRate } from "./pricing.mjs";
 import { CACHE_TTL_MS } from "./config.mjs";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -24,18 +25,35 @@ async function cached(key, fn) {
 const routes = {
   "/api/floating-band": () => cached("band", () => fetchFloatingBand(GRAPH_API_KEY)),
   "/api/midnight-curve": async () => {
-    const { curve, benchmark90d } = await cached("midnight", fetchMidnightCurve);
-    return { curve, benchmark90d };
+    const { curve, benchmark } = await cached("midnight", fetchMidnightCurve);
+    return { curve, benchmark90d: benchmark(90) };
+  },
+  "/api/quote": async (params) => {
+    const tenorDays = Number(params.get("tenor") ?? 90);
+    const collateralRatioBps = Number(params.get("ratioBps") ?? 13_000);
+    const { benchmark } = await cached("midnight", fetchMidnightCurve);
+    const bench = benchmark(tenorDays);
+    if (!bench) return { error: "no curve" };
+    const opts = {};
+    for (const k of ["volAnnual", "recovery", "liquidityPremiumBps", "settlementFeeBps"]) {
+      if (params.has(k)) opts[k] = Number(params.get(k));
+    }
+    const q = quoteFacilityRate({ tenorDays, collateralRatioBps, benchmarkAprPct: bench.aprPct, opts });
+    return { ...q, benchmark: bench };
   },
   "/api/rates": async () => {
     const [band, midnight] = await Promise.all([
       cached("band", () => fetchFloatingBand(GRAPH_API_KEY)),
       cached("midnight", fetchMidnightCurve),
     ]);
+    const bench90 = midnight.benchmark(90);
     return {
       asOf: new Date().toISOString(),
       floating: band,
-      fixed: { curve: midnight.curve, benchmark90d: midnight.benchmark90d },
+      fixed: { curve: midnight.curve, benchmark90d: bench90 },
+      suggested90d: bench90
+        ? quoteFacilityRate({ tenorDays: 90, collateralRatioBps: 15_000, benchmarkAprPct: bench90.aprPct })
+        : null,
     };
   },
 };
@@ -43,13 +61,14 @@ const routes = {
 createServer(async (req, res) => {
   res.setHeader("access-control-allow-origin", "*");
   try {
-    const route = routes[req.url];
+    const url = new URL(req.url, "http://x");
+    const route = routes[url.pathname];
     if (route) {
-      const body = JSON.stringify(await route(), null, 2);
+      const body = JSON.stringify(await route(url.searchParams), null, 2);
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(body);
     }
-    if (req.url === "/" || req.url === "/dashboard") {
+    if (url.pathname === "/" || url.pathname === "/dashboard") {
       const html = await readFile(new URL("./dashboard.html", import.meta.url));
       res.writeHead(200, { "content-type": "text/html" });
       return res.end(html);

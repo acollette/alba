@@ -30,16 +30,40 @@ export async function fetchFloatingBand(apiKey) {
     }),
   );
 
-  const rates = perProtocol.filter((p) => p.borrowApr != null);
+  // SOFR-style discipline: the headline composite is VOLUME-WEIGHTED and venues below
+  // a liquidity floor are excluded from it (they stay visible in `protocols`). A $24k
+  // book must not move a benchmark anchored by $450M of borrow.
+  const rated = perProtocol.filter((p) => p.borrowApr != null);
+  const included = rated.filter((p) => p.totalBorrowUSD >= MIN_BORROW_USD);
+  const weight = included.reduce((s, p) => s + p.totalBorrowUSD, 0);
+  const composite = weight
+    ? round2(included.reduce((s, p) => s + p.borrowApr * p.totalBorrowUSD, 0) / weight)
+    : null;
+
   return {
-    protocols: perProtocol,
-    band: rates.length
+    protocols: rated.map((p) => ({ ...p, includedInComposite: p.totalBorrowUSD >= MIN_BORROW_USD })),
+    composite: {
+      borrowApr: composite,
+      method: `borrow-balance-weighted mean, venues ≥ $${(MIN_BORROW_USD / 1e6).toFixed(0)}M borrow`,
+      venues: included.map((p) => p.protocol),
+      totalBorrowUSD: Math.round(weight),
+    },
+    band: included.length
       ? {
-          borrowMin: Math.min(...rates.map((p) => p.borrowApr)),
-          borrowMax: Math.max(...rates.map((p) => p.borrowApr)),
+          borrowMin: Math.min(...included.map((p) => p.borrowApr)),
+          borrowMax: Math.max(...included.map((p) => p.borrowApr)),
+        }
+      : null,
+    rawRange: rated.length
+      ? {
+          borrowMin: Math.min(...rated.map((p) => p.borrowApr)),
+          borrowMax: Math.max(...rated.map((p) => p.borrowApr)),
         }
       : null,
   };
 }
 
+export const MIN_BORROW_USD = 1_000_000;
+
 const num = (x) => (x == null ? null : Math.round(Number(x) * 100) / 100);
+const round2 = (v) => Math.round(v * 100) / 100;

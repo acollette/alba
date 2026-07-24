@@ -61,14 +61,14 @@
 <div class="viz-root">
   <header>
     <h1>Alba — live pricing context</h1>
-    <p>Fixed benchmark: Morpho Midnight cbBTC/USDC order books · Floating band: one Messari-standardized query, four Base protocols, via The Graph gateway</p>
+    <p>Fixed benchmark: Morpho Midnight cbBTC/USDC order books (depth-filtered, clip-executable) · Floating: one Messari-standardized query, four Base protocols via The Graph, borrow-weighted ≥ $1M venues</p>
   </header>
 
   <div class="tiles" id="tiles"></div>
 
   <div class="card">
     <h2>USDC term structure — fixed curve vs floating band</h2>
-    <div class="sub">Implied best-ask APR by maturity (Midnight, live) · variable borrow APR range (Aave v3 · Compound v3 · Moonwell · Seamless, live)</div>
+    <div class="sub">Executable APR by maturity ($25k clip VWAP, dust books excluded) · weighted floating band (venues ≥ $1M borrow)</div>
     <div class="legend" id="legend"></div>
     <div class="chart-wrap" id="wrap">
       <svg id="chart" role="img" aria-label="Term structure: Midnight fixed curve, floating borrow band, and the Alba facility offer"></svg>
@@ -88,14 +88,17 @@ async function main() {
   const r = await fetch("/api/rates").then((x) => x.json());
   const curve = r.fixed.curve;
   const band = r.floating.band;
+  const composite = r.floating.composite;
   const protocols = r.floating.protocols.filter((p) => p.borrowApr != null);
   const bench = r.fixed.benchmark90d;
+  const suggested = r.suggested90d;
 
   // ---- stat tiles
   const tiles = [
-    { label: "Midnight " + OFFER_DAYS + "d benchmark", value: fmt(bench) + "%", sub: "interpolated from live order books" },
-    { label: "Floating borrow band", value: fmt(band.borrowMin) + "–" + fmt(band.borrowMax) + "%", sub: protocols.map((p) => p.protocol).join(" · ") },
-    { label: "This facility", value: fmt(OFFER_PCT) + "%", sub: "Midnight " + OFFER_DAYS + "d " + spread(OFFER_PCT, bench) },
+    { label: "Midnight " + OFFER_DAYS + "d benchmark", value: fmt(bench.aprPct) + "%", sub: bench.method },
+    { label: "Floating composite (weighted)", value: fmt(composite.borrowApr) + "%", sub: composite.venues.join(" · ") + " · $" + (composite.totalBorrowUSD / 1e6).toFixed(0) + "M borrow" },
+    { label: "Desk model · 90d · 150% collateral", value: fmt(suggested.suggestedAprPct) + "%", sub: "benchmark + " + suggested.breakdown.gapRiskBps + "bps gap risk + " + suggested.breakdown.liquidityPremiumBps + "bps liquidity" },
+    { label: "This facility", value: fmt(OFFER_PCT) + "%", sub: spread(OFFER_PCT, suggested.suggestedAprPct) + " vs model" },
   ];
   document.getElementById("tiles").innerHTML = tiles.map((t) =>
     `<div class="tile"><div class="label">${t.label}</div><div class="value">${t.value}</div><div class="sub">${t.sub}</div></div>`).join("");
@@ -106,21 +109,23 @@ async function main() {
     `<span class="key"><i class="dot" style="background:${css("--offer")}"></i>Alba facility offer</span>` +
     `<span class="key"><i class="wash" style="background:${css("--band")}"></i>Floating borrow band (4 protocols)</span>`;
 
-  drawChart(curve, band, protocols);
+  drawChart(curve, band, bench);
 
   // ---- table view (the always-available identity/value channel)
   const rows = [
-    ...curve.map((c) => [`Midnight fixed · ${c.maturityDate}`, c.days + "d", fmt(c.aprPct) + "%"]),
-    ...protocols.map((p) => [`${p.protocol} variable borrow`, "open", fmt(p.borrowApr) + "%"]),
-    [`Alba facility offer`, OFFER_DAYS + "d", fmt(OFFER_PCT) + "%"],
+    ...curve.map((c) => [`Midnight fixed · ${c.maturityDate}`, c.days + "d", fmt(c.aprPct) + "%", "$" + (c.depthUSDC / 1000).toFixed(0) + "k book"]),
+    [`Midnight ${OFFER_DAYS}d benchmark`, OFFER_DAYS + "d", fmt(bench.aprPct) + "%", bench.method],
+    ...protocols.map((p) => [`${p.protocol} variable borrow`, "open", fmt(p.borrowApr) + "%",
+      "$" + (p.totalBorrowUSD / 1e6).toFixed(1) + "M borrow" + (p.includedInComposite ? "" : " · below floor, excluded")]),
+    [`Alba facility offer`, OFFER_DAYS + "d", fmt(OFFER_PCT) + "%", "bilateral quote"],
   ];
   document.getElementById("table").innerHTML =
-    `<caption>All plotted values</caption><tr><th>Series</th><th>Tenor</th><th>APR</th></tr>` +
-    rows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+    `<caption>All plotted values</caption><tr><th>Series</th><th>Tenor</th><th>APR</th><th>Basis</th></tr>` +
+    rows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("");
   document.getElementById("asof").textContent = "Live at " + r.asOf + " · 90s cache · nothing mocked";
 }
 
-function drawChart(curve, band, protocols) {
+function drawChart(curve, band, bench) {
   const W = Math.max(640, Math.min(document.getElementById("wrap").clientWidth, 980)), H = 300;
   const M = { l: 44, r: 150, t: 16, b: 34 };
   const iw = W - M.l - M.r, ih = H - M.t - M.b;
@@ -155,6 +160,13 @@ function drawChart(curve, band, protocols) {
     for (const [i, p] of pts.entries()) {
       s += `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="${css("--surface-1")}"/>`; // 2px surface ring
       s += `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${css("--fixed")}" data-i="${i}" class="pt"/>`;
+    }
+    // extrapolated benchmark: dashed continuation + hollow marker (honestly not-observed)
+    if (bench && bench.days > curve.at(-1).days) {
+      const bx = x(bench.days), by = y(bench.aprPct);
+      s += `<path d="M ${pts.at(-1)[0]} ${pts.at(-1)[1]} L ${bx} ${by}" fill="none" stroke="${css("--fixed")}" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"/>`;
+      s += `<circle cx="${bx}" cy="${by}" r="5" fill="${css("--surface-1")}" stroke="${css("--fixed")}" stroke-width="2"/>`;
+      s += `<text x="${bx}" y="${by + 18}" text-anchor="middle" font-size="10" fill="${css("--ink-3")}">extrapolated</text>`;
     }
     // direct end-label for the subject series
     s += `<text x="${pts.at(-1)[0] + 10}" y="${pts.at(-1)[1] - 8}" font-size="11" fill="${css("--ink-2")}">Midnight fixed ${fmt(curve.at(-1).aprPct)}%</text>`;

@@ -31,10 +31,9 @@ contract Test6_DefaultPath is Test {
     uint256 constant TERM = 90 days;
 
     uint256 constant DRAW1 = 100_000e6;
-    uint256 constant COLLAT1 = 1.3e8; // 130% at 100k USDC per unit
+    uint256 constant COLLAT1 = 1.5e8; // 150% at 100k USDC per unit
 
-    // Auction params: start 105% of the 100k oracle price, floor ~85% at expiry
-    uint256 constant START_BID_REF = 136_500e6; // 1.3 × 105_000e6
+    // Auction params: start 105% of oracle (computed at arm time), floor ~85% at expiry
     uint16 constant DURATION = 3600;
     uint64 constant DECAY = 0.99994e18; // ≈80.6% of start after 3600s
 
@@ -91,7 +90,7 @@ contract Test6_DefaultPath is Test {
             IERC20(address(usdc)),
             IERC20(address(cbbtc)),
             oracle,
-            13_000
+            15_000
         );
         vm.stopPrank();
 
@@ -193,7 +192,7 @@ contract Test6_DefaultPath is Test {
                 bidToken: address(usdc),
                 collateralToken: address(cbbtc),
                 collateralAmount: COLLAT1,
-                startBidRef: START_BID_REF,
+                startBidRef: 157_500e6, // 1.5 cbBTC x 105% x 100k oracle, marked at arm time
                 target: target,
                 startTime: uint40(block.timestamp),
                 duration: DURATION,

@@ -38,7 +38,7 @@ contract Test7_AxelarWiring is Test {
     uint256 constant RATE_BPS = 820;
     uint256 constant TERM = 90 days;
     uint256 constant DRAW1 = 100_000e6;
-    uint256 constant COLLAT1 = 1.3e8;
+    uint256 constant COLLAT1 = 1.5e8;
 
     string constant SOURCE_CHAIN = "hedera";
     string constant SOURCE_ADDR = "0xDEA1Re915";
@@ -100,7 +100,7 @@ contract Test7_AxelarWiring is Test {
             IERC20(address(usdc)),
             IERC20(address(cbbtc)),
             oracle,
-            13_000
+            15_000
         );
         vm.stopPrank();
 

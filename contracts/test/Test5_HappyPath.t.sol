@@ -32,9 +32,9 @@ contract Test5_HappyPath is Test {
 
     uint256 constant DRAW1 = 100_000e6;
     uint256 constant DRAW2 = 50_000e6;
-    // 130% collateralization at 100k USDC per cbBTC-mock unit price
-    uint256 constant COLLAT1 = 1.3e8;
-    uint256 constant COLLAT2 = 0.65e8;
+    // 150% collateralization at 100k USDC per cbBTC-mock unit price
+    uint256 constant COLLAT1 = 1.5e8;
+    uint256 constant COLLAT2 = 0.75e8;
 
     TermRouter router;
     AlbaOrderBuilder builder;
@@ -50,7 +50,7 @@ contract Test5_HappyPath is Test {
     ISwapVM.Order facilityOrder;
     bytes32 facilityHash;
     bytes32 constant FACILITY_ID = bytes32(uint256(0xFAC));
-    uint256 constant COLLATERAL_RATIO_BPS = 13_000; // 130%, marked to oracle at draw time
+    uint256 constant COLLATERAL_RATIO_BPS = 15_000; // 150%, marked to oracle at draw time (model-sized, docs/PRICING.md)
 
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
