@@ -5,13 +5,9 @@ pragma solidity ^0.8.20;
 /// Calls never revert: failures return a zero schedule address and a non-22 response code
 /// (ordinals of the HAPI ResponseCodeEnum; 22 == SUCCESS).
 interface IHederaScheduleService {
-    function scheduleCall(
-        address to,
-        uint256 expirySecond,
-        uint256 gasLimit,
-        uint64 value,
-        bytes memory callData
-    ) external returns (int64 responseCode, address scheduleAddress);
+    function scheduleCall(address to, uint256 expirySecond, uint256 gasLimit, uint64 value, bytes memory callData)
+        external
+        returns (int64 responseCode, address scheduleAddress);
 
     function scheduleCallWithPayer(
         address to,

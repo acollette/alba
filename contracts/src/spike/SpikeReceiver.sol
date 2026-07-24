@@ -7,7 +7,12 @@ import {AxelarExecutable} from "axelar-gmp-sdk-solidity/contracts/executable/Axe
 /// Axelar message executes on Base Sepolia. Emits the decoded payload, nothing else.
 contract SpikeReceiver is AxelarExecutable {
     event TriggerReceived(
-        bytes32 indexed commandId, string sourceChain, string sourceAddress, uint256 facilityId, uint256 drawId, string action
+        bytes32 indexed commandId,
+        string sourceChain,
+        string sourceAddress,
+        uint256 facilityId,
+        uint256 drawId,
+        string action
     );
 
     constructor(address gateway_) AxelarExecutable(gateway_) {}

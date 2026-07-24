@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { Simulator } from "@1inch/solidity-utils/contracts/mixins/Simulator.sol";
+import {Simulator} from "@1inch/solidity-utils/contracts/mixins/Simulator.sol";
 
-import { SwapVM } from "swap-vm/src/SwapVM.sol";
-import { Context } from "swap-vm/src/libs/VM.sol";
-import { Opcodes } from "swap-vm/src/opcodes/Opcodes.sol";
+import {SwapVM} from "swap-vm/src/SwapVM.sol";
+import {Context} from "swap-vm/src/libs/VM.sol";
+import {Opcodes} from "swap-vm/src/opcodes/Opcodes.sol";
 
-import { ChronosProgramBuilder } from "./lib/ProgramBuilder.sol";
+import {ChronosProgramBuilder} from "./lib/ProgramBuilder.sol";
 
 /// @title TermRouter — SwapVM router for term credit (Chronos)
 /// @notice Redeployment of the SwapVM router (allowed by the 1inch Aqua brief) pointing at the
@@ -17,7 +17,7 @@ contract TermRouter is Simulator, SwapVM, ChronosProgramBuilder {
     constructor(address aqua, address weth, address owner)
         SwapVM(aqua, weth, owner, "Chronos TermRouter", "1.0.0")
         Opcodes(aqua)
-    { }
+    {}
 
     /// @dev Built-in table (46 entries) + Chronos opcodes at indices 46/47/48
     function _instructions()

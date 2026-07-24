@@ -24,7 +24,12 @@ contract ChronosTriggerSpike {
     string public destinationChain;
     string public destinationAddress; // receiver address as checksummed hex string
 
-    constructor(address gateway_, address gasService_, string memory destinationChain_, string memory destinationAddress_) {
+    constructor(
+        address gateway_,
+        address gasService_,
+        string memory destinationChain_,
+        string memory destinationAddress_
+    ) {
         gateway = IAxelarGateway(gateway_);
         gasService = IAxelarGasService(gasService_);
         destinationChain = destinationChain_;

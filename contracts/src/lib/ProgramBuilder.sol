@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { ISwapVM } from "swap-vm/src/interfaces/ISwapVM.sol";
-import { Context } from "swap-vm/src/libs/VM.sol";
-import { MakerTraitsLib } from "swap-vm/src/libs/MakerTraits.sol";
-import { Opcodes } from "swap-vm/src/opcodes/Opcodes.sol";
-import { LimitSwapArgsBuilder } from "swap-vm/src/instructions/LimitSwap.sol";
-import { Program, ProgramBuilder } from "swap-vm/test/utils/ProgramBuilder.sol";
+import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
+import {Context} from "swap-vm/src/libs/VM.sol";
+import {MakerTraitsLib} from "swap-vm/src/libs/MakerTraits.sol";
+import {Opcodes} from "swap-vm/src/opcodes/Opcodes.sol";
+import {LimitSwapArgsBuilder} from "swap-vm/src/instructions/LimitSwap.sol";
+import {Program, ProgramBuilder} from "swap-vm/test/utils/ProgramBuilder.sol";
 
-import { ChronosOpcodes } from "../opcodes/ChronosOpcodes.sol";
+import {ChronosOpcodes} from "../opcodes/ChronosOpcodes.sol";
 
 /// @title ChronosProgramBuilder — single source of truth for order construction
 /// @notice Every Chronos order is built here and ONLY here. `aqua.ship()` calldata and the
@@ -39,7 +39,12 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
     function buildAquaLimitLeg(AquaLegTerms memory t)
         public
         pure
-        returns (ISwapVM.Order memory order, bytes memory shipStrategy, address[] memory tokens, uint256[] memory amounts)
+        returns (
+            ISwapVM.Order memory order,
+            bytes memory shipStrategy,
+            address[] memory tokens,
+            uint256[] memory amounts
+        )
     {
         Program memory p = ProgramBuilder.init(_instructions());
         bytes memory bytecode = bytes.concat(
@@ -80,7 +85,11 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
         shipStrategy = abi.encode(order);
     }
 
-    function _shipArrays(AquaLegTerms memory t) private pure returns (address[] memory tokens, uint256[] memory amounts) {
+    function _shipArrays(AquaLegTerms memory t)
+        private
+        pure
+        returns (address[] memory tokens, uint256[] memory amounts)
+    {
         tokens = new address[](2);
         amounts = new uint256[](2);
         tokens[0] = t.takerToken;
@@ -90,5 +99,9 @@ abstract contract ChronosProgramBuilder is Opcodes, ChronosOpcodes {
     }
 
     /// @dev Resolved by TermRouter with the composed opcode table (built-ins + Chronos)
-    function _instructions() internal pure virtual returns (function(Context memory, bytes calldata) internal[] memory);
+    function _instructions()
+        internal
+        pure
+        virtual
+        returns (function(Context memory, bytes calldata) internal[] memory);
 }
