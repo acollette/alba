@@ -1,0 +1,9 @@
+{
+  "name": "chronos-rates",
+  "version": "0.1.0",
+  "description": "Rates layer for Chronos: one Messari-standardized query across four Base lending protocols (The Graph) + the live Morpho Midnight fixed-rate curve.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node src/server.mjs" }
+}
