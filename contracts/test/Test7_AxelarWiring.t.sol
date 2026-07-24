@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Test} from "forge-std/Test.sol";
 
 import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
-import {TokenMock} from "@1inch/solidity-utils/contracts/mocks/TokenMock.sol";
+import {TokenCustomDecimalsMock} from "@1inch/solidity-utils/contracts/mocks/TokenCustomDecimalsMock.sol";
 import {IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
@@ -12,6 +12,7 @@ import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
 import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {AxelarSettlementExecutor} from "../src/AxelarSettlementExecutor.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
@@ -44,11 +45,12 @@ contract Test7_AxelarWiring is Test {
 
     TermRouter router;
     ChronosOrderBuilder builder;
+    MockV3Aggregator oracle;
     CollateralEscrow escrow;
     AxelarSettlementExecutor executor;
     MockAxelarGateway gateway;
-    TokenMock usdc;
-    TokenMock cbbtc;
+    TokenCustomDecimalsMock usdc;
+    TokenCustomDecimalsMock cbbtc;
 
     address lender = makeAddr("lender");
     address borrower = makeAddr("borrower");
@@ -64,13 +66,14 @@ contract Test7_AxelarWiring is Test {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
         builder = new ChronosOrderBuilder(address(AQUA));
+        oracle = new MockV3Aggregator(8, 100_000e8);
         gateway = new MockAxelarGateway();
         executor = new AxelarSettlementExecutor(address(gateway), router, SOURCE_CHAIN, SOURCE_ADDR);
         escrow = new CollateralEscrow(address(executor), router, builder, feeSink);
         executor.setEscrow(escrow);
 
-        usdc = new TokenMock("Mock USDC", "USDC");
-        cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
+        usdc = new TokenCustomDecimalsMock("Mock USDC", "USDC", 0, 6);
+        cbbtc = new TokenCustomDecimalsMock("Mock cbBTC", "CBBTC", 0, 8);
 
         // Publish facility
         usdc.mint(lender, FACILITY);
@@ -91,7 +94,7 @@ contract Test7_AxelarWiring is Test {
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), 1.3e15
+            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
         );
         vm.stopPrank();
 
@@ -118,7 +121,7 @@ contract Test7_AxelarWiring is Test {
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
         executor.registerSettlement(
-            DRAW_ID, maturityOrder, address(cbbtc), address(usdc), repayment, lender, 136_500e6, 3600, 0.99994e18
+            DRAW_ID, maturityOrder, address(cbbtc), address(usdc), repayment, lender, 3600, 0.99994e18
         );
         vm.stopPrank();
     }
@@ -169,6 +172,7 @@ contract Test7_AxelarWiring is Test {
         usdc.transfer(gone, bal);
 
         vm.warp(maturity);
+        oracle.setAnswer(100_000e8); // fresh mark post-warp (staleness guard is live)
         executor.execute(bytes32("cmd2"), SOURCE_CHAIN, SOURCE_ADDR, _payload());
 
         // Settlement failed → auction armed in the same tx; collateral still in escrow
@@ -190,7 +194,7 @@ contract Test7_AxelarWiring is Test {
         vm.expectRevert(abi.encodeWithSelector(AxelarSettlementExecutor.OnlyOrderMaker.selector, lender, borrower));
         vm.prank(lender);
         executor.registerSettlement(
-            bytes32(uint256(2)), maturityOrder, address(cbbtc), address(usdc), repayment, lender, 1, 1, 1
+            bytes32(uint256(2)), maturityOrder, address(cbbtc), address(usdc), repayment, lender, 1, 1
         );
     }
 
@@ -199,7 +203,7 @@ contract Test7_AxelarWiring is Test {
         view
         returns (address borrower_, IERC20 token, uint256 amount, uint256 unused, CollateralEscrow.DrawState state)
     {
-        (borrower_, token, amount, state) = escrow.draws(drawId);
+        (, borrower_, token, amount, state) = escrow.draws(drawId);
         unused = 0;
     }
 }

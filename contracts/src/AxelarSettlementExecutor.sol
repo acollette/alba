@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {AxelarExecutable} from "axelar-gmp-sdk-solidity/contracts/executable/AxelarExecutable.sol";
-import {IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
@@ -33,7 +32,6 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         address pullToken;
         uint256 repayment;
         address lender;
-        uint256 startBidRef;
         uint16 auctionDuration;
         uint64 auctionDecay;
         bool exists;
@@ -72,7 +70,6 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         address pullToken,
         uint256 repayment,
         address lender,
-        uint256 startBidRef,
         uint16 auctionDuration,
         uint64 auctionDecay
     ) external {
@@ -84,7 +81,6 @@ contract AxelarSettlementExecutor is AxelarExecutable {
             pullToken: pullToken,
             repayment: repayment,
             lender: lender,
-            startBidRef: startBidRef,
             auctionDuration: auctionDuration,
             auctionDecay: auctionDecay,
             exists: true,
@@ -122,9 +118,7 @@ contract AxelarSettlementExecutor is AxelarExecutable {
             escrow.release(drawId);
             emit Settled(drawId, s.repayment, s.lender);
         } catch {
-            bytes32 auctionHash = escrow.armAuction(
-                drawId, s.lender, IERC20(s.pullToken), s.repayment, s.startBidRef, s.auctionDuration, s.auctionDecay
-            );
+            bytes32 auctionHash = escrow.armAuction(drawId, s.repayment, s.auctionDuration, s.auctionDecay);
             emit Defaulted(drawId, auctionHash);
         }
     }

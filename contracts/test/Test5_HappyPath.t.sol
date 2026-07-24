@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Test} from "forge-std/Test.sol";
 
 import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
-import {TokenMock} from "@1inch/solidity-utils/contracts/mocks/TokenMock.sol";
+import {TokenCustomDecimalsMock} from "@1inch/solidity-utils/contracts/mocks/TokenCustomDecimalsMock.sol";
 import {IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
@@ -13,6 +13,7 @@ import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 import {TermRouter} from "../src/TermRouter.sol";
 import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
 import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
@@ -37,9 +38,10 @@ contract Test5_HappyPath is Test {
 
     TermRouter router;
     ChronosOrderBuilder builder;
+    MockV3Aggregator oracle;
     CollateralEscrow escrow;
-    TokenMock usdc;
-    TokenMock cbbtc;
+    TokenCustomDecimalsMock usdc;
+    TokenCustomDecimalsMock cbbtc;
 
     address lender = makeAddr("lender");
     address borrower = makeAddr("borrower");
@@ -48,15 +50,16 @@ contract Test5_HappyPath is Test {
     ISwapVM.Order facilityOrder;
     bytes32 facilityHash;
     bytes32 constant FACILITY_ID = bytes32(uint256(0xFAC));
-    uint256 constant COLLATERAL_RATIO_1E18 = 1.3e15; // 1.3e8 collateral per 100_000e6 drawn (130%)
+    uint256 constant COLLATERAL_RATIO_BPS = 13_000; // 130%, marked to oracle at draw time
 
     function setUp() public {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
         builder = new ChronosOrderBuilder(address(AQUA));
+        oracle = new MockV3Aggregator(8, 100_000e8);
         escrow = new CollateralEscrow(executor, router, builder, makeAddr("feeSink"));
-        usdc = new TokenMock("Mock USDC", "USDC");
-        cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
+        usdc = new TokenCustomDecimalsMock("Mock USDC", "USDC", 0, 6);
+        cbbtc = new TokenCustomDecimalsMock("Mock cbBTC", "CBBTC", 0, 8);
 
         // Lender publishes the facility: funds never leave the wallet, only approval + ship
         usdc.mint(lender, FACILITY);
@@ -80,7 +83,7 @@ contract Test5_HappyPath is Test {
         facilityHash = AQUA.ship(address(router), strategy, tokens, amounts);
         vm.prank(lender);
         escrow.registerFacility(
-            FACILITY_ID, facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), COLLATERAL_RATIO_1E18
+            FACILITY_ID, facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, COLLATERAL_RATIO_BPS
         );
 
         cbbtc.mint(borrower, 5e8);
@@ -178,6 +181,7 @@ contract Test5_HappyPath is Test {
         assertEq(cbbtc.balanceOf(address(escrow)), COLLAT2, "draw-2 collateral must remain locked");
 
         // Facility remains usable: borrower still has 150k of capacity
+        oracle.setAnswer(100_000e8); // fresh mark post-warp (staleness guard is live)
         uint256 usdcBefore = usdc.balanceOf(borrower);
         vm.prank(borrower);
         escrow.draw(FACILITY_ID, bytes32(uint256(3)), 150_000e6);

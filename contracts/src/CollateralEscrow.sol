@@ -2,11 +2,13 @@
 pragma solidity 0.8.30;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20, IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "./TermRouter.sol";
+import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
 import {ChronosProgramBuilder} from "./lib/ProgramBuilder.sol";
 
 /// @title CollateralEscrow — per-draw collateral custody + auction maker for Chronos
@@ -37,6 +39,8 @@ contract CollateralEscrow {
     error DrawNotLocked(bytes32 drawId);
     error AuctionNotArmed(bytes32 drawId);
     error AuctionNotCovered(bytes32 drawId, uint256 raised, uint256 target);
+    error OracleInvalidPrice(int256 answer);
+    error OracleStale(uint256 updatedAt, uint256 maxStaleness);
 
     enum DrawState {
         NONE,
@@ -47,6 +51,7 @@ contract CollateralEscrow {
     }
 
     struct Draw {
+        bytes32 facilityId;
         address borrower;
         IERC20 token;
         uint256 amount;
@@ -58,7 +63,11 @@ contract CollateralEscrow {
         address lender;
         IERC20 loanToken;
         IERC20 collateralToken;
-        uint256 collateralPerLoan1e18; // collateral units per loan unit, 1e18-scaled (130% etc.)
+        IAggregatorV3 oracle; // collateral/USD feed; loan token assumed USD-stable
+        uint256 collateralRatioBps; // e.g. 13_000 = 130%
+        uint8 loanDecimals;
+        uint8 collateralDecimals;
+        uint8 feedDecimals;
         bool exists;
     }
 
@@ -70,7 +79,7 @@ contract CollateralEscrow {
         uint256 fee;
     }
 
-    event FacilityRegistered(bytes32 indexed facilityId, address indexed lender, uint256 collateralPerLoan1e18);
+    event FacilityRegistered(bytes32 indexed facilityId, address indexed lender, uint256 collateralRatioBps);
     event Drawn(
         bytes32 indexed facilityId, bytes32 indexed drawId, address indexed borrower, uint256 amount, uint256 collateral
     );
@@ -85,6 +94,9 @@ contract CollateralEscrow {
 
     /// @notice Liquidation fee in basis points — a constant, not a knob.
     uint256 public constant LIQ_FEE_BPS = 50; // 0.50%
+    /// @notice Auction start premium over oracle price, and feed staleness bound — constants too.
+    uint256 public constant AUCTION_START_PREMIUM_BPS = 10_500; // 105% of oracle at arm time
+    uint256 public constant ORACLE_MAX_STALENESS = 1 days;
 
     /// @notice Settlement executor (AxelarSettlementExecutor in production, manual in tests)
     address public immutable EXECUTOR;
@@ -122,7 +134,8 @@ contract CollateralEscrow {
         ISwapVM.Order calldata order,
         IERC20 loanToken,
         IERC20 collateralToken,
-        uint256 collateralPerLoan1e18
+        IAggregatorV3 oracle,
+        uint256 collateralRatioBps
     ) external {
         require(!facilities[facilityId].exists, FacilityAlreadyRegistered(facilityId));
         require(msg.sender == order.maker, OnlyFacilityLender(msg.sender, order.maker));
@@ -131,10 +144,33 @@ contract CollateralEscrow {
             lender: msg.sender,
             loanToken: loanToken,
             collateralToken: collateralToken,
-            collateralPerLoan1e18: collateralPerLoan1e18,
+            oracle: oracle,
+            collateralRatioBps: collateralRatioBps,
+            loanDecimals: IERC20Metadata(address(loanToken)).decimals(),
+            collateralDecimals: IERC20Metadata(address(collateralToken)).decimals(),
+            feedDecimals: oracle.decimals(),
             exists: true
         });
-        emit FacilityRegistered(facilityId, msg.sender, collateralPerLoan1e18);
+        emit FacilityRegistered(facilityId, msg.sender, collateralRatioBps);
+    }
+
+    /// @notice Live collateral requirement for a draw of `amount` loan tokens, at the
+    /// current oracle price: amount × ratio / price, in collateral token units.
+    function collateralForDraw(bytes32 facilityId, uint256 amount) public view returns (uint256) {
+        Facility storage f = facilities[facilityId];
+        require(f.exists, FacilityUnknown(facilityId));
+        uint256 price = _freshPrice(f);
+        return Math.ceilDiv(
+            amount * f.collateralRatioBps * 10 ** (f.feedDecimals + f.collateralDecimals),
+            10_000 * 10 ** f.loanDecimals * price
+        );
+    }
+
+    function _freshPrice(Facility storage f) private view returns (uint256) {
+        (, int256 answer,, uint256 updatedAt,) = f.oracle.latestRoundData();
+        require(answer > 0, OracleInvalidPrice(answer));
+        require(block.timestamp - updatedAt <= ORACLE_MAX_STALENESS, OracleStale(updatedAt, ORACLE_MAX_STALENESS));
+        return uint256(answer);
     }
 
     /// @notice THE draw: pulls pro-rata collateral from the caller and executes the facility
@@ -147,9 +183,14 @@ contract CollateralEscrow {
         require(f.exists, FacilityUnknown(facilityId));
         require(draws[drawId].state == DrawState.NONE, DrawAlreadyExists(drawId));
 
-        collateral = Math.ceilDiv(amount * f.collateralPerLoan1e18, 1e18);
-        draws[drawId] =
-            Draw({borrower: msg.sender, token: f.collateralToken, amount: collateral, state: DrawState.LOCKED});
+        collateral = collateralForDraw(facilityId, amount);
+        draws[drawId] = Draw({
+            facilityId: facilityId,
+            borrower: msg.sender,
+            token: f.collateralToken,
+            amount: collateral,
+            state: DrawState.LOCKED
+        });
         f.collateralToken.safeTransferFrom(msg.sender, address(this), collateral);
         emit CollateralLocked(drawId, msg.sender, address(f.collateralToken), collateral);
 
@@ -195,28 +236,30 @@ contract CollateralEscrow {
     /// @notice Arm the Dutch-auction liquidation after a confirmed failed repayment pull.
     /// The order is built by the router's program builder — the same single source of truth
     /// as every other leg — and covers THIS draw's collateral only (bounded allowance).
+    /// The start price is marked to the oracle AT ARM TIME (105% premium, immutable constant),
+    /// never a stale registration-time number. Lender and bid token derive from the facility.
     /// @param debt Outstanding repayment owed to the lender
-    /// @param startBidRef Bid reference at start ≈ collateral × ~105% oracle price
     /// @param duration Auction lifetime seconds; expiry enforces the price floor
     /// @param decayFactor Per-second decay ×1e18; floor = start × decay^duration (~85% oracle)
-    function armAuction(
-        bytes32 drawId,
-        address lender,
-        IERC20 bidToken,
-        uint256 debt,
-        uint256 startBidRef,
-        uint16 duration,
-        uint64 decayFactor
-    ) external onlyExecutor returns (bytes32 orderHash) {
+    function armAuction(bytes32 drawId, uint256 debt, uint16 duration, uint64 decayFactor)
+        external
+        onlyExecutor
+        returns (bytes32 orderHash)
+    {
         Draw storage draw = draws[drawId];
         require(draw.state == DrawState.LOCKED, DrawNotLocked(drawId));
         draw.state = DrawState.AUCTIONING;
+
+        Facility storage f = facilities[draw.facilityId];
+        uint256 startBidRef = (
+            draw.amount * _freshPrice(f) * AUCTION_START_PREMIUM_BPS * 10 ** f.loanDecimals
+        ) / (10_000 * 10 ** (f.collateralDecimals + f.feedDecimals));
 
         uint256 fee = (debt * LIQ_FEE_BPS) / 10_000;
         ISwapVM.Order memory order = BUILDER.buildAuctionLeg(
             ChronosProgramBuilder.AuctionTerms({
                 maker: address(this),
-                bidToken: address(bidToken),
+                bidToken: address(f.loanToken),
                 collateralToken: address(draw.token),
                 collateralAmount: draw.amount,
                 startBidRef: startBidRef,
@@ -232,7 +275,8 @@ contract CollateralEscrow {
         draw.token.forceApprove(address(ROUTER), draw.amount);
         armedOrders[orderHash] = true;
 
-        auctions[drawId] = Auction({orderHash: orderHash, lender: lender, bidToken: bidToken, debt: debt, fee: fee});
+        auctions[drawId] =
+            Auction({orderHash: orderHash, lender: f.lender, bidToken: f.loanToken, debt: debt, fee: fee});
         emit AuctionArmed(drawId, orderHash, debt + fee);
     }
 

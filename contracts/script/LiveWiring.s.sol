@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Script, console} from "forge-std/Script.sol";
 
 import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
-import {TokenMock} from "@1inch/solidity-utils/contracts/mocks/TokenMock.sol";
+import {TokenCustomDecimalsMock} from "@1inch/solidity-utils/contracts/mocks/TokenCustomDecimalsMock.sol";
 import {IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
@@ -13,6 +13,7 @@ import {TermRouter} from "../src/TermRouter.sol";
 import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {AxelarSettlementExecutor} from "../src/AxelarSettlementExecutor.sol";
+import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 
 /// @notice Live wiring on Base Sepolia: deploy the real stack (router, builder, executor,
@@ -32,11 +33,15 @@ contract LiveWiring is Script {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         address me = vm.addr(pk);
         IAqua aqua = IAqua(vm.envAddress("AQUA_BS"));
-        TokenMock usdc = TokenMock(vm.envAddress("USDC_BS"));
-        TokenMock cbbtc = TokenMock(vm.envAddress("CBBTC_BS"));
         string memory triggerAddrStr = vm.envString("TRIGGER_ADDR_STR");
 
         vm.startBroadcast(pk);
+
+        // Honest decimals (USDC 6, cbBTC 8) + collateral/USD oracle (mock: no cbBTC/USD
+        // feed exists on Base Sepolia; production wiring = Chainlink on Base mainnet)
+        TokenCustomDecimalsMock usdc = new TokenCustomDecimalsMock("Chronos USDC", "USDC", 0, 6);
+        TokenCustomDecimalsMock cbbtc = new TokenCustomDecimalsMock("Chronos cbBTC", "CBBTC", 0, 8);
+        MockV3Aggregator oracle = new MockV3Aggregator(8, 100_000e8);
 
         TermRouter router = new TermRouter(address(aqua), WETH, me);
         ChronosOrderBuilder builder = new ChronosOrderBuilder(address(aqua));
@@ -61,7 +66,7 @@ contract LiveWiring is Script {
         );
         aqua.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), 1.3e15
+            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
         );
 
         // Atomic collateralized draw: collateral in, cash out, one tx (borrower = me)
@@ -90,15 +95,7 @@ contract LiveWiring is Script {
         );
         aqua.ship(address(router), mStrategy, mTokens, mAmounts);
         executor.registerSettlement(
-            bytes32(uint256(1)),
-            maturityOrder,
-            address(cbbtc),
-            address(usdc),
-            repayment,
-            me,
-            136_500e6,
-            3600,
-            0.99994e18
+            bytes32(uint256(1)), maturityOrder, address(cbbtc), address(usdc), repayment, me, 3600, 0.99994e18
         );
 
         vm.stopBroadcast();
@@ -107,6 +104,9 @@ contract LiveWiring is Script {
         console.log("BUILDER:", address(builder));
         console.log("EXECUTOR:", address(executor));
         console.log("ESCROW:", address(escrow));
+        console.log("USDC:", address(usdc));
+        console.log("CBBTC:", address(cbbtc));
+        console.log("ORACLE:", address(oracle));
         console.log("maturity (notBefore):", maturity);
         console.log("repayment:", repayment);
     }

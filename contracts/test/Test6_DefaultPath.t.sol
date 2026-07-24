@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import {Test} from "forge-std/Test.sol";
 
 import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
-import {TokenMock} from "@1inch/solidity-utils/contracts/mocks/TokenMock.sol";
+import {TokenCustomDecimalsMock} from "@1inch/solidity-utils/contracts/mocks/TokenCustomDecimalsMock.sol";
 import {IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
@@ -13,6 +13,7 @@ import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
 import {TermRouter} from "../src/TermRouter.sol";
 import {ChronosOrderBuilder} from "../src/ChronosOrderBuilder.sol";
+import {MockV3Aggregator} from "../src/mocks/MockV3Aggregator.sol";
 import {CollateralEscrow} from "../src/CollateralEscrow.sol";
 import {ChronosOpcodes} from "../src/opcodes/ChronosOpcodes.sol";
 import {ChronosProgramBuilder} from "../src/lib/ProgramBuilder.sol";
@@ -39,9 +40,10 @@ contract Test6_DefaultPath is Test {
 
     TermRouter router;
     ChronosOrderBuilder builder;
+    MockV3Aggregator oracle;
     CollateralEscrow escrow;
-    TokenMock usdc;
-    TokenMock cbbtc;
+    TokenCustomDecimalsMock usdc;
+    TokenCustomDecimalsMock cbbtc;
 
     address lender = makeAddr("lender");
     address borrower = makeAddr("borrower");
@@ -59,9 +61,10 @@ contract Test6_DefaultPath is Test {
         vm.createSelectFork(vm.envOr("BASE_MAINNET_RPC", string("https://mainnet.base.org")), FORK_BLOCK);
         router = new TermRouter(address(AQUA), WETH, address(this));
         builder = new ChronosOrderBuilder(address(AQUA));
+        oracle = new MockV3Aggregator(8, 100_000e8);
         escrow = new CollateralEscrow(executor, router, builder, feeSink);
-        usdc = new TokenMock("Mock USDC", "USDC");
-        cbbtc = new TokenMock("Mock cbBTC", "CBBTC");
+        usdc = new TokenCustomDecimalsMock("Mock USDC", "USDC", 0, 6);
+        cbbtc = new TokenCustomDecimalsMock("Mock cbBTC", "CBBTC", 0, 8);
 
         // Publish facility, lock collateral, draw 100k, arm maturity leg
         usdc.mint(lender, FACILITY);
@@ -82,7 +85,7 @@ contract Test6_DefaultPath is Test {
         );
         AQUA.ship(address(router), strategy, tokens, amounts);
         escrow.registerFacility(
-            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), 1.3e15
+            bytes32(uint256(0xFAC)), facilityOrder, IERC20(address(usdc)), IERC20(address(cbbtc)), oracle, 13_000
         );
         vm.stopPrank();
 
@@ -164,6 +167,7 @@ contract Test6_DefaultPath is Test {
         usdc.transfer(gone, borrowerBal);
 
         vm.warp(maturity);
+        oracle.setAnswer(100_000e8); // fresh mark post-warp (staleness guard is live)
 
         // Settlement attempt reverts — same trigger arms the auction (manual executor here)
         vm.prank(executor);
@@ -171,8 +175,7 @@ contract Test6_DefaultPath is Test {
         router.swap(maturityOrder, address(cbbtc), address(usdc), repayment, _pullData(executor));
 
         vm.prank(executor);
-        bytes32 auctionHash =
-            escrow.armAuction(drawId, lender, IERC20(address(usdc)), repayment, START_BID_REF, DURATION, DECAY);
+        bytes32 auctionHash = escrow.armAuction(drawId, repayment, DURATION, DECAY);
 
         uint256 fee = (repayment * escrow.LIQ_FEE_BPS()) / 10_000;
         uint256 target = repayment + fee;
@@ -243,15 +246,15 @@ contract Test6_DefaultPath is Test {
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyExecutor.selector, borrower));
         vm.prank(borrower);
-        escrow.armAuction(drawId, lender, IERC20(address(usdc)), repayment, START_BID_REF, DURATION, DECAY);
+        escrow.armAuction(drawId, repayment, DURATION, DECAY);
 
         vm.prank(executor);
-        escrow.armAuction(drawId, lender, IERC20(address(usdc)), repayment, START_BID_REF, DURATION, DECAY);
+        escrow.armAuction(drawId, repayment, DURATION, DECAY);
 
         // Second arm (or release) on the same draw must fail — single-claim collateral
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.DrawNotLocked.selector, drawId));
         vm.prank(executor);
-        escrow.armAuction(drawId, lender, IERC20(address(usdc)), repayment, START_BID_REF, DURATION, DECAY);
+        escrow.armAuction(drawId, repayment, DURATION, DECAY);
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.DrawNotLocked.selector, drawId));
         vm.prank(executor);
