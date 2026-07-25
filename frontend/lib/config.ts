@@ -1,10 +1,10 @@
-// Live Base Sepolia stack (v5, sentinel-hardened). Override via NEXT_PUBLIC_* envs.
+// Live Base Sepolia stack (v6, two-wallet lender/borrower). Override via NEXT_PUBLIC_* envs.
 export const ADDR = {
-  escrow: (process.env.NEXT_PUBLIC_ESCROW ?? "0x1cCe09DEa73c584D01B00D23b0DA36040e7C0EBa") as `0x${string}`,
-  router: (process.env.NEXT_PUBLIC_ROUTER ?? "0xE300cEf02a044dBb885AA20C3aa3DBada48E54dc") as `0x${string}`,
-  usdc: (process.env.NEXT_PUBLIC_USDC ?? "0x7F29563801e1B5545796c6aE8b8F137528e28482") as `0x${string}`,
-  cbbtc: (process.env.NEXT_PUBLIC_CBBTC ?? "0x0fFC12d5BFa76A0929453096C12b1D5882D7bDfd") as `0x${string}`,
-  oracle: (process.env.NEXT_PUBLIC_ORACLE ?? "0x0CA7B7332478cAb455Bf3ACcf40FF223072b2dfB") as `0x${string}`,
+  escrow: (process.env.NEXT_PUBLIC_ESCROW ?? "0x4CD5fa75186bEccc51215207037D5c1Fbe4ADebb") as `0x${string}`,
+  router: (process.env.NEXT_PUBLIC_ROUTER ?? "0xe51FD28546EB5449e7C9607Ef937706c5e2AfB95") as `0x${string}`,
+  usdc: (process.env.NEXT_PUBLIC_USDC ?? "0xa816781C4Fb9700476e38b73fED09c5dD6DC1fFb") as `0x${string}`,
+  cbbtc: (process.env.NEXT_PUBLIC_CBBTC ?? "0x3a53c0117Edfc8E745f7254F75d11e5085E210a8") as `0x${string}`,
+  oracle: (process.env.NEXT_PUBLIC_ORACLE ?? "0x869105F636D6Ac7fDa4E49B6787359E114c96Ddb") as `0x${string}`,
 } as const;
 
 export const FACILITY_ID = (process.env.NEXT_PUBLIC_FACILITY_ID ??
@@ -12,12 +12,12 @@ export const FACILITY_ID = (process.env.NEXT_PUBLIC_FACILITY_ID ??
 
 export const FACILITY_SIZE = BigInt(process.env.NEXT_PUBLIC_FACILITY_SIZE ?? "300000000000"); // 300k USDC (6 dec)
 
-export const START_BLOCK = BigInt(process.env.NEXT_PUBLIC_START_BLOCK ?? "44584000");
+export const START_BLOCK = BigInt(process.env.NEXT_PUBLIC_START_BLOCK ?? "44586000");
 
 export const RATES_API = process.env.NEXT_PUBLIC_RATES_API ?? "http://localhost:8787";
 
-// Hedera sentinel/trigger (v6) — schedule IDs surfaced from the mirror node
-export const HEDERA_TRIGGER = "0xeb3D736b5Ce06fe875011Bae95218BD1616bC2f8";
+// Hedera sentinel/trigger (v7) — schedule IDs surfaced from the mirror node
+export const HEDERA_TRIGGER = "0xe636135Bc58B5c732479B3303425C47653B8801f";
 export const HEDERA_MIRROR = "https://testnet.mirrornode.hedera.com";
 
 export const USDC_DEC = 6;

@@ -19,7 +19,7 @@ import {AlbaProgramBuilder} from "../src/lib/ProgramBuilder.sol";
 /// @notice Live wiring on Base Sepolia: deploy the real stack (router, builder, executor,
 /// escrow), publish a facility, lock collateral, draw, arm the maturity leg, and register
 /// the settlement package — so the NEXT Hedera-scheduled GMP message settles it for real.
-/// One EOA plays lender and borrower on the live leg (gas economy; fork demo has actors).
+/// Two wallets: lender (deployer) and a funded borrower key — real bilateral roles.
 contract LiveWiring is Script {
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant AXELAR_GATEWAY = 0xe432150cce91c13a887f7D836923d5597adD8E31;
@@ -52,8 +52,14 @@ contract LiveWiring is Script {
         CollateralEscrow escrow = new CollateralEscrow(address(executor), router, builder, me);
         executor.setEscrow(escrow);
 
+        // Fund the borrower wallet: gas + collateral + interest headroom for repayment
+        (bool sent,) = payable(borrower).call{value: 0.0025 ether}("");
+        require(sent, "borrower gas funding failed");
+        cbbtc.mint(borrower, COLLAT1);
+        usdc.mint(borrower, 10_000e6); // interest headroom; principal arrives via the draw
+
         // Publish the facility (lender = me): approval + ship, funds stay in wallet
-        usdc.mint(me, FACILITY + 50_000e6); // + interest headroom for the repayment pull
+        usdc.mint(me, FACILITY);
         usdc.approve(address(aqua), type(uint256).max);
         (ISwapVM.Order memory facilityOrder, bytes memory strategy, address[] memory tokens, uint256[] memory amounts) =
         builder.buildFacilityLeg(
@@ -71,7 +77,7 @@ contract LiveWiring is Script {
             bytes32(uint256(0xFAC)),
             facilityOrder,
             CollateralEscrow.FacilityParams({
-                borrower: me,
+                borrower: borrower,
                 loanToken: IERC20(address(usdc)),
                 collateralToken: IERC20(address(cbbtc)),
                 oracle: oracle,

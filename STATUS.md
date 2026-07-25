@@ -172,3 +172,24 @@ called directly — `liquidate` is permissionless by design).
 footgun — the inner cure can OOG, the catch swallows it, the tx "succeeds" cheaply as
 `intervened=false`, and the simulation therefore never allocates real gas. Fix:
 `MIN_CHECK_GAS` floor makes under-allocation revert retryably. Great Q&A material.
+
+## LIVE RUN #5 ✅ — two wallets, two names, interest exact
+
+Stack v6 (guard: lender ≠ borrower enforced on-chain). Lender = deployer; borrower =
+its own funded key `0x71551F0BdE3bCCF3C3449219EfCF95BA0F160209`, signing its own
+approvals, atomic draw, cure + maturity legs, and settlement registration.
+
+- Hedera SETTLE schedule (tx `0x491be5f6...9ed5ae`) → Axelar → executor settled at
+  Base Sepolia block 44,604,624, tx
+  `0xfb74e7ca337c20c3a15dd23325f26a1a1b852cae89645611131e6a7b1c5edeff`.
+- **Lender: 300,000.061263 USDC** — commitment home + EXACTLY the 61.263 USDC accrued
+  (4.60% × 100k × 420s/365d). **Borrower: 1.5 cbBTC home**, lighter by the same 61.263.
+  Bilateral, autonomous, exact to six decimals.
+
+**Current live stack (v6):** Router `0xe51FD28546EB5449e7C9607Ef937706c5e2AfB95` ·
+Builder `0xB84a8eaCaa349A50e9F7C87e2aDbF7EaC98DEa1c` · Executor
+`0x9c781F36F6070101B6B6771474a73fB44A3dB032` · Escrow
+`0x4CD5fa75186bEccc51215207037D5c1Fbe4ADebb` · USDC `0xa816781C4Fb9700476e38b73fED09c5dD6DC1fFb`
+· cbBTC `0x3a53c0117Edfc8E745f7254F75d11e5085E210a8` · Oracle
+`0x869105F636D6Ac7fDa4E49B6787359E114c96Ddb` · Hedera trigger v7
+`0xe636135Bc58B5c732479B3303425C47653B8801f`. Frontend defaults point here.
