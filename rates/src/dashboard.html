@@ -114,7 +114,8 @@ async function main() {
 
   // ---- table view (the always-available identity/value channel)
   const rows = [
-    ...curve.map((c) => [`Midnight fixed · ${c.maturityDate}`, c.days + "d", fmt(c.aprPct) + "%", "$" + (c.depthUSDC / 1000).toFixed(0) + "k book"]),
+    ...curve.map((c) => [`Midnight fixed · ${c.maturityDate}`, c.days + "d", fmt(c.aprPct) + "%",
+      "$" + (c.depthUSDC / 1000).toFixed(0) + "k book" + (c.side === "lend-floor" ? " · bid side only — indicative floor" : "")]),
     [`Midnight ${OFFER_DAYS}d benchmark`, OFFER_DAYS + "d", fmt(bench.aprPct) + "%", bench.method],
     ...protocols.map((p) => [`${p.protocol} variable borrow`, "open", fmt(p.borrowApr) + "%",
       "$" + (p.totalBorrowUSD / 1e6).toFixed(1) + "M borrow"
@@ -156,13 +157,21 @@ function drawChart(curve, band, bench) {
 
   // Midnight fixed curve: 10% wash under the line, 2px line, ≥8px ringed markers
   const pts = curve.map((c) => [x(c.days), y(c.aprPct)]);
+  const hasFloors = curve.some((c) => c.side === "lend-floor");
   if (pts.length) {
     const line = pts.map((p, i) => (i ? "L" : "M") + p[0] + " " + p[1]).join(" ");
     s += `<path d="${line} L ${pts.at(-1)[0]} ${y(0)} L ${pts[0][0]} ${y(0)} Z" fill="${css("--fixed")}" opacity="0.10"/>`;
-    s += `<path d="${line}" fill="none" stroke="${css("--fixed")}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // solid = executable borrow side throughout; dashed = includes indicative floor points
+    s += `<path d="${line}" fill="none" stroke="${css("--fixed")}" stroke-width="2"${hasFloors ? ' stroke-dasharray="2 5"' : ""} stroke-linejoin="round" stroke-linecap="round"/>`;
     for (const [i, p] of pts.entries()) {
       s += `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="${css("--surface-1")}"/>`; // 2px surface ring
-      s += `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${css("--fixed")}" data-i="${i}" class="pt"/>`;
+      if (curve[i].side === "lend-floor") {
+        // hollow = not executable for a borrower (same honesty code as "extrapolated")
+        s += `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${css("--surface-1")}" stroke="${css("--fixed")}" stroke-width="2" data-i="${i}" class="pt"/>`;
+        s += `<text x="${p[0]}" y="${p[1] + 18}" text-anchor="middle" font-size="10" fill="${css("--ink-3")}">floor</text>`;
+      } else {
+        s += `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${css("--fixed")}" data-i="${i}" class="pt"/>`;
+      }
     }
     // extrapolated benchmark: dashed continuation + hollow marker (honestly not-observed)
     if (bench && bench.days > curve.at(-1).days) {

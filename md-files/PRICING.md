@@ -13,6 +13,12 @@ Raw Midnight order books are NOT a curve — touch prices in dust books are nois
   fill a standard **$25k clip**, walking the live ask book best-first — never the top
   of book for $1.
 - **Depth filter:** books that cannot fill **$5k** are excluded entirely.
+- **Two-sided marking:** maturities are priced off the **borrow side** (asks — what a
+  borrower can execute). When that side is empty but standing lend interest exists,
+  the bid side gives a **labeled indicative floor** (`side: "lend-floor"`: a borrower
+  there would pay at least this) — hollow marker + dashed curve on the chart, flagged
+  in the table. If the bootstrap has to use floor points (fewer than two executable
+  borrow points), the benchmark's method string says so. Sides are never mixed silently.
 - **Interpolation:** linear in **ln(discount factor)** vs time — equivalent to
   piecewise-constant forward rates, the standard short-end bootstrap. (Linear in APR
   can imply negative forwards; log-DF cannot.)

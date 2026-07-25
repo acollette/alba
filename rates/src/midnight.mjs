@@ -40,23 +40,35 @@ export async function fetchMidnightCurve() {
     }
   }
 
+  // TWO-SIDED, like a desk marks a thin market: price the BORROW side (asks — what a
+  // borrower can execute) where it has depth; where it's empty, fall back to the LEND
+  // side (bids — standing lender demand) as a labeled one-sided INDICATIVE FLOOR: a
+  // borrower there would pay at least this. Sides are never mixed silently.
   const points = await Promise.all(
     [...byMaturity.values()].map(async (m) => {
-      const r = await fetch(
-        `${MIDNIGHT_API}/books/${m.market_id}/asks/takeable-offers`,
-      );
-      const { data: offers } = await r.json();
-      if (!offers?.length) return null;
+      const readBook = async (side) => {
+        const r = await fetch(`${MIDNIGHT_API}/books/${m.market_id}/${side}/takeable-offers`);
+        const { data: offers } = await r.json();
+        const levels = (offers ?? [])
+          .map((o) => ({ price: tickToPrice(Number(o.offer.tick)), usdc: Number(o.units) / 1e6 }))
+          // walk from the touch: highest zc price first on BOTH sides. Asks: cheapest
+          // executable borrow. Bids: the most aggressive standing lend interest — its
+          // yield anchors the indicative floor (verified against the venue UI's best rate).
+          .sort((a, b) => b.price - a.price);
+        return { levels, depth: levels.reduce((s, l) => s + l.usdc, 0) };
+      };
+
+      let side = "borrow";
+      let book = await readBook("asks");
+      if (book.depth < MIN_DEPTH_USDC) {
+        side = "lend-floor";
+        book = await readBook("bids");
+        if (book.depth < MIN_DEPTH_USDC) return null; // dust on both sides — not quotable
+      }
 
       // Walk the book best-first; executable price = VWAP to fill the clip
-      const levels = offers
-        .map((o) => ({ price: tickToPrice(Number(o.offer.tick)), usdc: Number(o.units) / 1e6 }))
-        .sort((a, b) => b.price - a.price); // higher zc price = cheaper borrow = better for taker
-      const depth = levels.reduce((s, l) => s + l.usdc, 0);
-      if (depth < MIN_DEPTH_USDC) return null; // dust book — not a quotable point
-
       let remaining = CLIP_USDC, cost = 0, filled = 0;
-      for (const l of levels) {
+      for (const l of book.levels) {
         const take = Math.min(remaining, l.usdc);
         cost += take * l.price;
         filled += take;
@@ -72,9 +84,10 @@ export async function fetchMidnightCurve() {
         years: t / (365 * 86400),
         aprPct: round2(((1 / price - 1) * (365 * 86400)) / t * 100),
         zeroCouponPrice: Math.round(price * 1e5) / 1e5,
-        depthUSDC: Math.round(depth),
+        depthUSDC: Math.round(book.depth),
         clipFilledUSDC: Math.round(filled),
         marketId: m.market_id,
+        side, // "borrow" = executable for a borrower; "lend-floor" = bid side only
       };
     }),
   );
@@ -91,7 +104,13 @@ export async function fetchMidnightCurve() {
  * forward flat and label the result extrapolated.
  */
 function makeBenchmark(curve) {
-  const pts = curve.map((c) => ({ t: c.years, lnDF: Math.log(c.zeroCouponPrice), days: c.days }));
+  // Bootstrap from executable borrow-side points when ≥2 exist; in a thin market,
+  // augment with the bid-side floor points — and SAY SO in the method label.
+  const borrowPts = curve.filter((c) => c.side !== "lend-floor");
+  const usable = borrowPts.length >= 2 ? borrowPts : curve;
+  const mixed = usable.length > borrowPts.length;
+  const suffix = mixed ? " · incl. bid-side floor points (thin borrow side)" : "";
+  const pts = usable.map((c) => ({ t: c.years, lnDF: Math.log(c.zeroCouponPrice), days: c.days }));
   return (days) => {
     if (!pts.length) return null;
     const t = days / 365;
@@ -120,7 +139,7 @@ function makeBenchmark(curve) {
       days,
       aprPct: round2(((1 / df - 1) / t) * 100),
       discountFactor: Math.round(df * 1e5) / 1e5,
-      method,
+      method: method + suffix,
     };
   };
 }
