@@ -1,0 +1,114 @@
+/* Alba — desk terminal tokens (shared language with rates/dashboard) */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink-1: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;
+  --grid: #e1e0d9;
+  --ring: rgba(11, 11, 11, 0.1);
+  --accent: #eb6834; /* Alba (dawn) — the facility color */
+  --bench: #2a78d6; /* Midnight/benchmark data */
+  --good: #0ca30c;
+  --bad: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink-1: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --grid: #2c2c2a;
+    --ring: rgba(255, 255, 255, 0.1);
+    --accent: #d95926;
+    --bench: #3987e5;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--page);
+  color: var(--ink-1);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+main { max-width: 880px; margin: 0 auto; padding: 24px clamp(14px, 4vw, 40px) 80px; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0; border-bottom: 1px solid var(--grid); margin-bottom: 22px;
+}
+.brand { font-weight: 700; letter-spacing: 0.12em; font-size: 15px; }
+.brand em { color: var(--accent); font-style: normal; }
+.brand small { color: var(--ink-3); font-weight: 400; letter-spacing: 0; margin-left: 10px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--ring); border-radius: 10px;
+  padding: 18px 20px; margin-bottom: 16px;
+}
+.card h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--ink-2); margin: 0 0 12px; font-weight: 600;
+}
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
+
+.tile { border: 1px solid var(--grid); border-radius: 8px; padding: 12px 16px; min-width: 148px; flex: 1; }
+.tile .label { font-size: 11.5px; color: var(--ink-2); margin-bottom: 3px; }
+.tile .value { font-size: 24px; font-weight: 650; }
+.tile .sub { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+.tile.accent .value { color: var(--accent); }
+
+.kv { display: flex; gap: 20px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin-top: 12px; }
+.kv b { color: var(--ink-1); font-weight: 600; }
+
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--grid);
+  color: var(--ink-2);
+}
+.badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+.badge.ok .dot { background: var(--good); }
+.badge.warn .dot { background: var(--bad); }
+
+button {
+  font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 9px 18px;
+}
+button.ghost { background: transparent; color: var(--ink-1); border: 1px solid var(--grid); }
+button:disabled { opacity: 0.45; cursor: default; }
+input {
+  font: inherit; background: var(--page); color: var(--ink-1);
+  border: 1px solid var(--grid); border-radius: 8px; padding: 9px 12px; width: 160px;
+  font-variant-numeric: tabular-nums;
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li {
+  display: flex; gap: 12px; align-items: baseline; padding: 9px 0;
+  border-bottom: 1px solid var(--grid); font-size: 13px;
+}
+.timeline li:last-child { border-bottom: none; }
+.timeline .t-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); flex: none; }
+.timeline .t-dot.accent { background: var(--accent); }
+.timeline .t-dot.good { background: var(--good); }
+.timeline .t-dot.bad { background: var(--bad); }
+.timeline .t-what { min-width: 170px; font-weight: 600; }
+.timeline .t-meta { color: var(--ink-2); flex: 1; overflow-wrap: anywhere; }
+.timeline .t-when { color: var(--ink-3); font-size: 12px; }
+
+.ratesline { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); }
+.ratesline b { color: var(--ink-1); }
+.ratesline .bench { color: var(--bench); font-weight: 600; }
+a { color: var(--bench); text-decoration: none; }
+.hint { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+.err { color: var(--bad); font-size: 12.5px; margin-top: 8px; overflow-wrap: anywhere; }
