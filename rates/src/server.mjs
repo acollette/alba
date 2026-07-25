@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { fetchFloatingBand } from "./graph.mjs";
+import { fetchFloatingBand, fetchCollateralBenchmark } from "./graph.mjs";
 import { fetchMidnightCurve } from "./midnight.mjs";
 import { quoteFacilityRate } from "./pricing.mjs";
 import { CACHE_TTL_MS } from "./config.mjs";
@@ -42,14 +42,16 @@ const routes = {
     return { ...q, benchmark: bench };
   },
   "/api/rates": async () => {
-    const [band, midnight] = await Promise.all([
+    const [band, midnight, collateral] = await Promise.all([
       cached("band", () => fetchFloatingBand(GRAPH_API_KEY)),
       cached("midnight", fetchMidnightCurve),
+      cached("collateral", () => fetchCollateralBenchmark(GRAPH_API_KEY)),
     ]);
     const bench90 = midnight.benchmark(90);
     return {
       asOf: new Date().toISOString(),
       floating: band,
+      collateralBenchmark: collateral,
       fixed: { curve: midnight.curve, benchmark90d: bench90 },
       suggested90d: bench90
         ? quoteFacilityRate({ tenorDays: 90, collateralRatioBps: 13_000, benchmarkAprPct: bench90.aprPct })

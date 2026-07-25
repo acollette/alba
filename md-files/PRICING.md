@@ -89,5 +89,5 @@ At +109bps all-in with no undrawn fee, Alba prices TIGHT for the product class.
 | `residualRiskBps` | 25 | between-checks jump + oracle latency + auction depth |
 | `liquidityPremiumBps` | 50 | non-fungible position + committed capacity |
 | `settlementFeeBps` | 0 | protocol constant when enabled |
-| initial / maintenance ratio | 130% / 115% | facility-immutable; the margin buffer |
+| initial / maintenance ratio | ≥137.0% / <128.2% (= Aave v3 Base cbBTC LTV 73% / LT 78%, read live via the standardized Graph query; fork tests use round 130/115) | facility-immutable; the margin buffer |
 | clip / depth floor / venue floor | $25k / $5k / $1M | curve + composite construction |

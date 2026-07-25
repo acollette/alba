@@ -81,8 +81,8 @@ contract LiveWiring is Script {
                 loanToken: IERC20(address(usdc)),
                 collateralToken: IERC20(address(cbbtc)),
                 oracle: oracle,
-                collateralRatioBps: 13_000,
-                maintenanceRatioBps: 11_500,
+                collateralRatioBps: 13_699, // = 1/73% — Aave v3 Base cbBTC max LTV, live via the Graph
+                maintenanceRatioBps: 12_821, // = 1/78% — Aave v3 Base cbBTC liquidation threshold
                 rateBps: RATE_BPS,
                 termSeconds: 420, // short live tenor so the settlement demo fits a coffee break
                 auctionDuration: 3600,

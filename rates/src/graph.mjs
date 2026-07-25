@@ -65,5 +65,32 @@ export async function fetchFloatingBand(apiKey) {
 
 export const MIN_BORROW_USD = 1_000_000;
 
+/** Margin calibration: Aave v3 Base's live cbBTC risk params via the SAME standardized schema. */
+export async function fetchCollateralBenchmark(apiKey) {
+  const res = await fetch(`${GRAPH_GATEWAY}/${apiKey}/subgraphs/id/${LENDING_SUBGRAPHS[0].id}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      query: `{ markets(where: {inputToken_: {symbol_in: ["cbBTC"]}}) {
+        name maximumLTV liquidationThreshold liquidationPenalty } }`,
+    }),
+  });
+  const { data, errors } = await res.json();
+  if (errors) throw new Error(errors[0].message);
+  const m = data.markets?.[0];
+  if (!m) return null;
+  const maxLTV = Number(m.maximumLTV);
+  const liqThreshold = Number(m.liquidationThreshold);
+  return {
+    source: m.name,
+    maxLTVPct: maxLTV,
+    liquidationThresholdPct: liqThreshold,
+    liquidationPenaltyPct: Number(m.liquidationPenalty),
+    // Alba's ratio convention (collateral / debt)
+    collateralRatioBps: Math.round(1e6 / maxLTV),
+    maintenanceRatioBps: Math.round(1e6 / liqThreshold),
+  };
+}
+
 const num = (x) => (x == null ? null : Math.round(Number(x) * 100) / 100);
 const round2 = (v) => Math.round(v * 100) / 100;

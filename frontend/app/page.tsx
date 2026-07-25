@@ -519,8 +519,8 @@ function NewDealCard() {
             loanToken: ADDR.usdc,
             collateralToken: ADDR.cbbtc,
             oracle: ADDR.oracle,
-            collateralRatioBps: 13_000n,
-            maintenanceRatioBps: 11_500n,
+            collateralRatioBps: 13_699n, // 73% max LTV — Aave v3 Base cbBTC, live via the Graph
+            maintenanceRatioBps: 12_821n, // 78% liquidation threshold
             rateBps,
             termSeconds: Number(termSeconds),
             auctionDuration: 3600,
@@ -576,7 +576,7 @@ function NewDealCard() {
           onChange={(e) => setAvailDays(e.target.value.replace(/[^0-9.]/g, ""))}
           aria-label="availability days"
         />
-        <span style={{ color: "var(--ink-2)" }}>day availability · 130/115 margining</span>
+        <span style={{ color: "var(--ink-2)" }}>day availability · Aave-matched margining (LTV 73% / LT 78%)</span>
         <button onClick={publish} disabled={!isConnected || busy}>
           Publish
         </button>
