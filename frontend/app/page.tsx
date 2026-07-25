@@ -38,6 +38,14 @@ const fmt = (v: bigint | undefined, dec: number, digits = 2) =>
   v === undefined ? "—" : Number(formatUnits(v, dec)).toLocaleString("en-US", { maximumFractionDigits: digits });
 
 const STATE_LABEL = ["—", "active", "settled", "auction", "liquidated"] as const;
+const EXPLORER = "https://sepolia.basescan.org";
+const fmtDrawId = (id: string) => {
+  try {
+    const v = BigInt(id);
+    if (v < 1_000_000_000n) return `#${v.toString()}`;
+  } catch {}
+  return `${id.slice(0, 6)}…${id.slice(-4)}`;
+};
 
 // Public RPCs cap eth_getLogs ranges; scan in windows so the book/timeline never
 // silently empty as the chain advances past a single-range limit.
@@ -184,6 +192,7 @@ function useFacility(facilityId: `0x${string}`) {
 
 type DrawRow = {
   drawId: `0x${string}`;
+  txHash: `0x${string}`;
   principal: bigint;
   collateral: bigint;
   debt: bigint;
@@ -215,6 +224,7 @@ function useDraws(facilityId: `0x${string}`) {
           ]);
           return {
             drawId: id,
+            txHash: e.transactionHash as `0x${string}`,
             principal: d[4],
             collateral: d[3],
             debt,
@@ -368,10 +378,16 @@ function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
           <div key={d.drawId} style={{ marginBottom: 14 }}>
             <div className="kv" style={{ marginTop: 0 }}>
               <span>
-                draw <b className="mono">{d.drawId.slice(0, 10)}…</b>
+                draw{" "}
+                <a className="mono" href={`${EXPLORER}/tx/${d.txHash}`} target="_blank" rel="noreferrer">
+                  <b>{fmtDrawId(d.drawId)} ↗</b>
+                </a>
               </span>
               <span>
-                owed <b className="num">{fmt(d.debt, USDC_DEC, 0)} USDC</b>
+                owed <b className="num">{fmt(d.debt, USDC_DEC, 2)} USDC</b>{" "}
+                <span style={{ color: "var(--ink-3)" }}>
+                  (incl. {fmt(d.debt - d.principal, USDC_DEC, 2)} interest, accruing per second)
+                </span>
               </span>
               <span>
                 matures <b>{new Date(d.maturity * 1000).toLocaleString()}</b>
@@ -407,6 +423,8 @@ function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
 
 function LenderBook({ facilityId }: { facilityId: `0x${string}` }) {
   const draws = useDraws(facilityId);
+  const { facility } = useFacility(facilityId);
+  const ratePct = facility?.[2] ? Number(facility[2].rateBps) / 100 : undefined;
   const rows = draws.data ?? [];
   const income = rows.filter((d) => d.state === 2);
   return (
@@ -418,7 +436,9 @@ function LenderBook({ facilityId }: { facilityId: `0x${string}` }) {
             <tr>
               <th>draw</th>
               <th>principal</th>
-              <th>accrued owed</th>
+              <th>rate</th>
+              <th>owed (accruing)</th>
+              <th>interest to date</th>
               <th>matures</th>
               <th>collateral</th>
               <th>status</th>
@@ -427,9 +447,15 @@ function LenderBook({ facilityId }: { facilityId: `0x${string}` }) {
           <tbody>
             {rows.map((d) => (
               <tr key={d.drawId}>
-                <td className="mono">{d.drawId.slice(0, 10)}…</td>
+                <td className="mono">
+                  <a href={`${EXPLORER}/tx/${d.txHash}`} target="_blank" rel="noreferrer" title="view the draw transaction on Basescan">
+                    {fmtDrawId(d.drawId)} ↗
+                  </a>
+                </td>
                 <td>{fmt(d.principal, USDC_DEC, 0)}</td>
-                <td>{d.state === 1 ? fmt(d.debt, USDC_DEC, 0) : "—"}</td>
+                <td>{ratePct !== undefined ? `${ratePct.toFixed(2)}%` : "—"}</td>
+                <td>{d.state === 1 ? fmt(d.debt, USDC_DEC, 2) : "—"}</td>
+                <td>{d.state === 1 ? fmt(d.debt - d.principal, USDC_DEC, 2) : "—"}</td>
                 <td>{new Date(d.maturity * 1000).toLocaleDateString()}</td>
                 <td>{fmt(d.collateral, CBBTC_DEC, 4)} cbBTC</td>
                 <td>
@@ -769,7 +795,14 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
   );
 }
 
-type Row = { key: string; kind: "accent" | "good" | "bad" | "plain"; what: string; meta: string; when: string };
+type Row = {
+  key: string;
+  kind: "accent" | "good" | "bad" | "plain";
+  what: string;
+  meta: string;
+  when: string;
+  tx?: string;
+};
 
 function Timeline() {
   const client = usePublicClient({ chainId: CHAIN_ID });
@@ -790,6 +823,7 @@ function Timeline() {
       for (const l of drawn)
         rows.push({
           key: `d${l.transactionHash}${l.logIndex}`,
+          tx: l.transactionHash,
           kind: "accent",
           what: "Drawn",
           meta: `${fmt(l.args.amount, USDC_DEC, 0)} USDC against ${fmt(l.args.collateral, CBBTC_DEC, 4)} cbBTC · draw ${String(l.args.drawId).slice(0, 10)}…`,
@@ -798,6 +832,7 @@ function Timeline() {
       for (const l of cured)
         rows.push({
           key: `c${l.transactionHash}${l.logIndex}`,
+          tx: l.transactionHash,
           kind: "good",
           what: l.args.fullClose ? "Cured — closed early" : "Cured — draw lives on",
           meta: `${fmt(l.args.amountPulled, USDC_DEC, 0)} USDC pulled from pre-authorized funds, zero penalty`,
@@ -806,6 +841,7 @@ function Timeline() {
       for (const l of released)
         rows.push({
           key: `r${l.transactionHash}${l.logIndex}`,
+          tx: l.transactionHash,
           kind: "good",
           what: "Collateral released",
           meta: `${fmt(l.args.amount, CBBTC_DEC, 4)} cbBTC home to the borrower`,
@@ -814,6 +850,7 @@ function Timeline() {
       for (const l of armed)
         rows.push({
           key: `a${l.transactionHash}${l.logIndex}`,
+          tx: l.transactionHash,
           kind: "bad",
           what: "Auction armed",
           meta: `Dutch auction targeting ${fmt(l.args.target, USDC_DEC, 0)} USDC — halts the moment the lender is whole`,
@@ -847,7 +884,10 @@ function Timeline() {
             <span className={`t-dot ${s.executed_timestamp ? "good" : ""}`} />
             <span className="t-what">Hedera schedule</span>
             <span className="t-meta mono">
-              {s.schedule_id} {s.executed_timestamp ? "— executed by the network" : "— armed, waiting"}
+              <a href={`https://hashscan.io/testnet/schedule/${s.schedule_id}`} target="_blank" rel="noreferrer">
+                {s.schedule_id} ↗
+              </a>{" "}
+              {s.executed_timestamp ? "— executed by the network" : "— armed, waiting"}
             </span>
             <span className="t-when">
               {s.executed_timestamp
@@ -861,7 +901,15 @@ function Timeline() {
             <span className={`t-dot ${r.kind === "plain" ? "" : r.kind}`} />
             <span className="t-what">{r.what}</span>
             <span className="t-meta">{r.meta}</span>
-            <span className="t-when num">{r.when}</span>
+            <span className="t-when num">
+              {r.tx ? (
+                <a href={`${EXPLORER}/tx/${r.tx}`} target="_blank" rel="noreferrer">
+                  {r.when} ↗
+                </a>
+              ) : (
+                r.when
+              )}
+            </span>
           </li>
         ))}
         {!logs.data?.length && !schedules.data?.length && (
