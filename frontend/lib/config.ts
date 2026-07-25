@@ -7,8 +7,12 @@ export const ADDR = {
   oracle: (process.env.NEXT_PUBLIC_ORACLE ?? "0x869105F636D6Ac7fDa4E49B6787359E114c96Ddb") as `0x${string}`,
 } as const;
 
-export const FACILITY_ID = (process.env.NEXT_PUBLIC_FACILITY_ID ??
+export const DEFAULT_FACILITY_ID = (process.env.NEXT_PUBLIC_FACILITY_ID ??
   "0x0000000000000000000000000000000000000000000000000000000000000fac") as `0x${string}`;
+
+export const AQUA = (process.env.NEXT_PUBLIC_AQUA ?? "0x29C10C31eB844D038A0Dc858997f8ADea1da3270") as `0x${string}`;
+export const BUILDER = (process.env.NEXT_PUBLIC_BUILDER ?? "0xB84a8eaCaa349A50e9F7C87e2aDbF7EaC98DEa1c") as `0x${string}`;
+export const CHAIN_ID = 84532; // Base Sepolia — reads pinned here regardless of wallet network
 
 export const FACILITY_SIZE = BigInt(process.env.NEXT_PUBLIC_FACILITY_SIZE ?? "300000000000"); // 300k USDC (6 dec)
 

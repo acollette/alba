@@ -137,3 +137,81 @@ export const erc20Abi = [
 export const oracleAbi = [
   { type: "function", name: "answer", stateMutability: "view", inputs: [], outputs: [{ type: "int256" }] },
 ] as const;
+
+export const builderAbi = [
+  {
+    type: "function", name: "buildFacilityLeg", stateMutability: "pure",
+    inputs: [
+      {
+        name: "t", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "counterToken", type: "address" },
+          { name: "pullToken", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "salt", type: "uint256" },
+        ],
+      },
+      { name: "taker", type: "address" },
+    ],
+    outputs: [
+      {
+        name: "order", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "traits", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+      { name: "shipStrategy", type: "bytes" },
+      { name: "tokens", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
+    ],
+  },
+] as const;
+
+export const aquaAbi = [
+  {
+    type: "function", name: "ship", stateMutability: "nonpayable",
+    inputs: [
+      { name: "app", type: "address" },
+      { name: "strategy", type: "bytes" },
+      { name: "tokens", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
+    ],
+    outputs: [{ type: "bytes32" }],
+  },
+] as const;
+
+export const registerFacilityAbi = [
+  {
+    type: "function", name: "registerFacility", stateMutability: "nonpayable",
+    inputs: [
+      { name: "facilityId", type: "bytes32" },
+      {
+        name: "order", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "traits", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+      {
+        name: "p", type: "tuple",
+        components: [
+          { name: "borrower", type: "address" },
+          { name: "loanToken", type: "address" },
+          { name: "collateralToken", type: "address" },
+          { name: "oracle", type: "address" },
+          { name: "collateralRatioBps", type: "uint256" },
+          { name: "maintenanceRatioBps", type: "uint256" },
+          { name: "rateBps", type: "uint256" },
+          { name: "termSeconds", type: "uint40" },
+          { name: "auctionDuration", type: "uint16" },
+          { name: "auctionDecay", type: "uint64" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+] as const;

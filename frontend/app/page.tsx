@@ -11,10 +11,21 @@ import {
   useWriteContract,
 } from "wagmi";
 import { formatUnits, parseUnits, toHex } from "viem";
-import { escrowAbi, routerAbi, erc20Abi, oracleAbi } from "@/lib/abi";
+import {
+  escrowAbi,
+  routerAbi,
+  erc20Abi,
+  oracleAbi,
+  builderAbi,
+  aquaAbi,
+  registerFacilityAbi,
+} from "@/lib/abi";
 import {
   ADDR,
-  FACILITY_ID,
+  AQUA,
+  BUILDER,
+  CHAIN_ID,
+  DEFAULT_FACILITY_ID,
   FACILITY_SIZE,
   START_BLOCK,
   RATES_API,
@@ -30,14 +41,25 @@ const fmt = (v: bigint | undefined, dec: number, digits = 2) =>
 const STATE_LABEL = ["—", "active", "settled", "auction", "liquidated"] as const;
 type Role = "lender" | "borrower";
 
+function useFacilityId(): `0x${string}` {
+  const [id, setId] = useState<`0x${string}`>(DEFAULT_FACILITY_ID);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("facility");
+    if (q && /^0x[0-9a-fA-F]{64}$/.test(q)) setId(q as `0x${string}`);
+  }, []);
+  return id;
+}
+
 export default function Page() {
+  const facilityId = useFacilityId();
   const { address } = useAccount();
-  const { facility } = useFacility();
+  const { facility } = useFacility(facilityId);
   const lenderAddr = facility?.[1]?.toLowerCase();
   const borrowerAddr = facility?.[2]?.borrower?.toLowerCase();
   const you = address?.toLowerCase();
   const youAreLender = !!you && you === lenderAddr;
   const youAreBorrower = !!you && you === borrowerAddr;
+  const isObserver = !!you && !!facility?.[6] && !youAreLender && !youAreBorrower;
 
   const [role, setRole] = useState<Role>("borrower");
   const touched = useRef(false);
@@ -70,14 +92,26 @@ export default function Page() {
         ))}
       </div>
 
-      <FacilityCard role={role} />
+      {isObserver && (
+        <div className="card" style={{ padding: "10px 16px" }}>
+          <span className="badge">
+            <span className="dot" />
+            observer — this wallet is not a party to this facility; views are read-only
+          </span>
+        </div>
+      )}
+
+      <FacilityCard facilityId={facilityId} role={role} />
       {role === "borrower" ? (
         <>
-          <BorrowerObligations />
-          <DrawPanel />
+          <BorrowerObligations facilityId={facilityId} />
+          <DrawPanel facilityId={facilityId} isParty={youAreBorrower} />
         </>
       ) : (
-        <LenderBook />
+        <>
+          <LenderBook facilityId={facilityId} />
+          <NewDealCard />
+        </>
       )}
       <Timeline />
     </main>
@@ -111,12 +145,13 @@ function Header() {
   );
 }
 
-function useFacility() {
+function useFacility(facilityId: `0x${string}`) {
   const facility = useReadContract({
     abi: escrowAbi,
     address: ADDR.escrow,
     functionName: "facilities",
-    args: [FACILITY_ID],
+    args: [facilityId],
+    chainId: CHAIN_ID,
   });
   const order = facility.data?.[0];
   const facilityHash = useReadContract({
@@ -124,6 +159,7 @@ function useFacility() {
     address: ADDR.router,
     functionName: "hash",
     args: order ? [order] : undefined,
+    chainId: CHAIN_ID,
     query: { enabled: !!order },
   });
   const lender = facility.data?.[1];
@@ -132,6 +168,7 @@ function useFacility() {
     address: ADDR.router,
     functionName: "coveredAmount",
     args: lender && facilityHash.data ? [lender, facilityHash.data] : undefined,
+    chainId: CHAIN_ID,
     query: { enabled: !!lender && !!facilityHash.data, refetchInterval: 8000 },
   });
   return { facility: facility.data, drawn: drawn.data };
@@ -149,10 +186,10 @@ type DrawRow = {
   required: bigint;
 };
 
-function useDraws() {
-  const client = usePublicClient();
+function useDraws(facilityId: `0x${string}`) {
+  const client = usePublicClient({ chainId: CHAIN_ID });
   return useQuery({
-    queryKey: ["draws"],
+    queryKey: ["draws", facilityId],
     enabled: !!client,
     refetchInterval: 15_000,
     queryFn: async (): Promise<DrawRow[]> => {
@@ -161,6 +198,7 @@ function useDraws() {
         abi: escrowAbi,
         address: ADDR.escrow,
         eventName: "Drawn",
+        args: { facilityId },
         fromBlock: START_BLOCK,
         toBlock: latest,
       });
@@ -192,13 +230,14 @@ function useDraws() {
   });
 }
 
-function FacilityCard({ role }: { role: Role }) {
-  const { facility, drawn } = useFacility();
+function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: Role }) {
+  const { facility, drawn } = useFacility(facilityId);
   const params = facility?.[2];
   const oraclePrice = useReadContract({
     abi: oracleAbi,
-    address: ADDR.oracle,
+    address: (params?.oracle as `0x${string}`) ?? ADDR.oracle,
     functionName: "answer",
+    chainId: CHAIN_ID,
     query: { refetchInterval: 8000 },
   });
 
@@ -218,7 +257,7 @@ function FacilityCard({ role }: { role: Role }) {
   return (
     <section className="card">
       <h2>
-        Facility <span className="mono">0xFAC</span> · cbBTC / USDC
+        Facility <span className="mono">{facilityId.slice(0, 10)}…</span> · cbBTC / USDC
       </h2>
       <div className="row">
         <div className="tile">
@@ -231,7 +270,13 @@ function FacilityCard({ role }: { role: Role }) {
         <div className="tile accent">
           <div className="label">{role === "lender" ? "Deployed" : "Drawn"}</div>
           <div className="value num">{fmt(drawn, USDC_DEC, 0)}</div>
-          <div className="sub">{role === "lender" ? "earning 4.60% fixed" : "cumulative, on-chain accounting"}</div>
+          <div className="sub">
+            {role === "lender"
+              ? rate !== undefined
+                ? `earning ${rate.toFixed(2)}% fixed`
+                : "earning fixed"
+              : "cumulative, on-chain accounting"}
+          </div>
         </div>
         <div className="tile">
           <div className="label">{role === "lender" ? "Undrawn" : "Available"}</div>
@@ -296,8 +341,8 @@ function FacilityCard({ role }: { role: Role }) {
   );
 }
 
-function BorrowerObligations() {
-  const draws = useDraws();
+function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
+  const draws = useDraws(facilityId);
   const active = (draws.data ?? []).filter((d) => d.state === 1);
   if (!active.length) return null;
   return (
@@ -340,8 +385,8 @@ function BorrowerObligations() {
   );
 }
 
-function LenderBook() {
-  const draws = useDraws();
+function LenderBook({ facilityId }: { facilityId: `0x${string}` }) {
+  const draws = useDraws(facilityId);
   const rows = draws.data ?? [];
   const income = rows.filter((d) => d.state === 2);
   return (
@@ -389,7 +434,141 @@ function LenderBook() {
   );
 }
 
-function DrawPanel() {
+/// Beat 2 — origination: configure the deal, publish (approve + ship + register), share the link
+function NewDealCard() {
+  const { address, isConnected } = useAccount();
+  const client = usePublicClient({ chainId: CHAIN_ID });
+  const { writeContractAsync } = useWriteContract();
+
+  const [borrower, setBorrower] = useState("");
+  const [size, setSize] = useState("300000");
+  const [ratePct, setRatePct] = useState("4.60");
+  const [termDays, setTermDays] = useState("90");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+  const [dealLink, setDealLink] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function publish() {
+    setError("");
+    setDealLink("");
+    if (!/^0x[0-9a-fA-F]{40}$/.test(borrower)) return setError("borrower must be an address (the deal has a name)");
+    setBusy(true);
+    try {
+      const sizeUnits = parseUnits(size, USDC_DEC);
+      const rateBps = BigInt(Math.round(Number(ratePct) * 100));
+      const termSeconds = BigInt(Math.round(Number(termDays) * 86400));
+      const salt = BigInt(Date.now());
+      const facilityId = toHex(salt, { size: 32 });
+
+      setStatus("1/3 approving USDC to Aqua (pull rights, funds stay put)…");
+      const allowance = await client!.readContract({
+        abi: erc20Abi, address: ADDR.usdc, functionName: "allowance", args: [address!, AQUA],
+      });
+      if (allowance < sizeUnits) {
+        await writeContractAsync({
+          abi: erc20Abi, address: ADDR.usdc, functionName: "approve", args: [AQUA, sizeUnits * 2n], chainId: CHAIN_ID,
+        });
+      }
+
+      setStatus("2/3 shipping the facility order to Aqua…");
+      const [order, strategy, tokens, amounts] = await client!.readContract({
+        abi: builderAbi,
+        address: BUILDER,
+        functionName: "buildFacilityLeg",
+        args: [
+          { maker: address!, counterToken: ADDR.cbbtc, pullToken: ADDR.usdc, amount: sizeUnits, salt },
+          ADDR.escrow,
+        ],
+      });
+      await writeContractAsync({
+        abi: aquaAbi, address: AQUA, functionName: "ship",
+        args: [ADDR.router, strategy, tokens as `0x${string}`[], amounts as bigint[]], chainId: CHAIN_ID,
+      });
+
+      setStatus("3/3 registering the deal (one name on each side)…");
+      await writeContractAsync({
+        abi: registerFacilityAbi, address: ADDR.escrow, functionName: "registerFacility",
+        args: [
+          facilityId,
+          order,
+          {
+            borrower: borrower as `0x${string}`,
+            loanToken: ADDR.usdc,
+            collateralToken: ADDR.cbbtc,
+            oracle: ADDR.oracle,
+            collateralRatioBps: 13_000n,
+            maintenanceRatioBps: 11_500n,
+            rateBps,
+            termSeconds: Number(termSeconds),
+            auctionDuration: 3600,
+            auctionDecay: 999940000000000000n,
+          },
+        ],
+        chainId: CHAIN_ID,
+      });
+
+      const link = `${window.location.origin}/?facility=${facilityId}`;
+      setDealLink(link);
+      setStatus("published — funds never left your wallet. Send the link.");
+    } catch (e: unknown) {
+      setError(String((e as Error).message ?? e).slice(0, 220));
+      setStatus("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>New deal — configure, publish, send the link</h2>
+      <div className="row" style={{ alignItems: "center" }}>
+        <input
+          style={{ width: 340 }}
+          className="mono"
+          placeholder="borrower address (the counterparty's name)"
+          value={borrower}
+          onChange={(e) => setBorrower(e.target.value.trim())}
+        />
+        <input value={size} onChange={(e) => setSize(e.target.value.replace(/[^0-9.]/g, ""))} aria-label="size USDC" />
+        <span style={{ color: "var(--ink-2)" }}>USDC ·</span>
+        <input
+          style={{ width: 80 }}
+          value={ratePct}
+          onChange={(e) => setRatePct(e.target.value.replace(/[^0-9.]/g, ""))}
+          aria-label="rate percent"
+        />
+        <span style={{ color: "var(--ink-2)" }}>% ·</span>
+        <input
+          style={{ width: 70 }}
+          value={termDays}
+          onChange={(e) => setTermDays(e.target.value.replace(/[^0-9.]/g, ""))}
+          aria-label="term days"
+        />
+        <span style={{ color: "var(--ink-2)" }}>day draws · 130/115 margining</span>
+        <button onClick={publish} disabled={!isConnected || busy}>
+          Publish
+        </button>
+      </div>
+      {status && <div className="hint">{status}</div>}
+      {dealLink && (
+        <div className="hint">
+          deal link:{" "}
+          <a href={dealLink} className="mono">
+            {dealLink}
+          </a>{" "}
+          <button className="ghost" style={{ padding: "3px 10px" }} onClick={() => navigator.clipboard.writeText(dealLink)}>
+            copy
+          </button>{" "}
+          — send it in Telegram; the borrower opens it, sees terms as code, and accepts by approving collateral.
+        </div>
+      )}
+      {error && <div className="err">{error}</div>}
+    </section>
+  );
+}
+
+function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty: boolean }) {
   const { isConnected, address } = useAccount();
   const [amount, setAmount] = useState("25000");
   const { writeContractAsync, isPending } = useWriteContract();
@@ -408,7 +587,8 @@ function DrawPanel() {
     abi: escrowAbi,
     address: ADDR.escrow,
     functionName: "collateralForDraw",
-    args: [FACILITY_ID, amountUnits],
+    args: [facilityId, amountUnits],
+    chainId: CHAIN_ID,
     query: { enabled: amountUnits > 0n, refetchInterval: 15_000 },
   });
 
@@ -417,6 +597,7 @@ function DrawPanel() {
     address: ADDR.cbbtc,
     functionName: "allowance",
     args: address ? [address, ADDR.escrow] : undefined,
+    chainId: CHAIN_ID,
     query: { enabled: !!address, refetchInterval: 8000 },
   });
 
@@ -426,14 +607,15 @@ function DrawPanel() {
   async function onApprove() {
     setError("");
     try {
-      setStatus("approving collateral…");
+      setStatus("approving collateral — this is the acceptance: terms are code…");
       await writeContractAsync({
         abi: erc20Abi,
         address: ADDR.cbbtc,
         functionName: "approve",
         args: [ADDR.escrow, collateral.data! * 2n],
+        chainId: CHAIN_ID,
       });
-      setStatus("approved");
+      setStatus("accepted — you can draw whenever you need the cash");
     } catch (e: unknown) {
       setError(String((e as Error).message ?? e).slice(0, 200));
       setStatus("");
@@ -449,7 +631,8 @@ function DrawPanel() {
         abi: escrowAbi,
         address: ADDR.escrow,
         functionName: "draw",
-        args: [FACILITY_ID, drawId, amountUnits],
+        args: [facilityId, drawId, amountUnits],
+        chainId: CHAIN_ID,
       });
       setStatus(`drawn ✓ drawId ${drawId.slice(0, 10)}…`);
     } catch (e: unknown) {
@@ -474,18 +657,18 @@ function DrawPanel() {
         </span>
         {needsApproval ? (
           <button onClick={onApprove} disabled={!isConnected || isPending}>
-            Approve cbBTC
+            Accept &amp; approve cbBTC
           </button>
         ) : (
-          <button onClick={onDraw} disabled={!isConnected || isPending || amountUnits === 0n}>
+          <button onClick={onDraw} disabled={!isConnected || isPending || amountUnits === 0n || !isParty}>
             Draw
           </button>
         )}
       </div>
       <div className="hint">
-        One transaction: collateral locks in the escrow and the facility&apos;s Aqua order pays out — the escrow is the
-        only doorway (<span className="mono">_onlyTaker</span>), so drawn funds without locked collateral are
-        structurally impossible.
+        {isParty
+          ? "One transaction: collateral locks in the escrow and the facility's Aqua order pays out — the escrow is the only doorway (_onlyTaker), so drawn funds without locked collateral are structurally impossible."
+          : "Only the named borrower can draw — this deal was sold to one name."}
       </div>
       {status && <div className="hint">{status}</div>}
       {error && <div className="err">{error}</div>}
@@ -496,7 +679,7 @@ function DrawPanel() {
 type Row = { key: string; kind: "accent" | "good" | "bad" | "plain"; what: string; meta: string; when: string };
 
 function Timeline() {
-  const client = usePublicClient();
+  const client = usePublicClient({ chainId: CHAIN_ID });
 
   const logs = useQuery({
     queryKey: ["timeline"],
