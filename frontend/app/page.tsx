@@ -270,7 +270,7 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
   return (
     <section className="card">
       <h2>
-        Facility <span className="mono">{facilityId.slice(0, 10)}…</span> · cbBTC / USDC
+        Facility <span className="mono">{fmtDrawId(facilityId)}</span> · cbBTC / USDC
       </h2>
       <div className="row">
         <div className="tile">
@@ -311,15 +311,11 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
         </span>
         <span title="collateral factor — the required initial margin">
           max LTV{" "}
-          <b className="num">
-            {params ? `${(1e6 / Number(params.collateralRatioBps)).toFixed(1)}% (post ≥${Number(params.collateralRatioBps) / 100}%)` : "—"}
-          </b>
+          <b className="num">{params ? `${(1e6 / Number(params.collateralRatioBps)).toFixed(1)}%` : "—"}</b>
         </span>
         <span title="liquidation threshold — below this the cure→auction waterfall runs">
           liq. threshold{" "}
-          <b className="num">
-            {params ? `${(1e6 / Number(params.maintenanceRatioBps)).toFixed(1)}% LTV (<${Number(params.maintenanceRatioBps) / 100}%)` : "—"}
-          </b>
+          <b className="num">{params ? `${(1e6 / Number(params.maintenanceRatioBps)).toFixed(1)}%` : "—"}</b>
         </span>
         <span>
           availability until{" "}
@@ -489,7 +485,7 @@ function NewDealCard() {
   const [borrower, setBorrower] = useState("");
   const [size, setSize] = useState("300000");
   const [ratePct, setRatePct] = useState("4.60");
-  const [termDays, setTermDays] = useState("90");
+  const [termSecs, setTermSecs] = useState("420");
   const [availDays, setAvailDays] = useState("364");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -505,7 +501,7 @@ function NewDealCard() {
       const sizeUnits = parseUnits(size, USDC_DEC);
       const grossCeiling = sizeUnits * 4n; // Aqua safety rail; the escrow meters revolving capacity
       const rateBps = BigInt(Math.round(Number(ratePct) * 100));
-      const termSeconds = BigInt(Math.round(Number(termDays) * 86400));
+      const termSeconds = BigInt(Math.round(Number(termSecs)));
       const salt = BigInt(Date.now());
       const facilityId = toHex(salt, { size: 32 });
 
@@ -545,7 +541,7 @@ function NewDealCard() {
             loanToken: ADDR.usdc,
             collateralToken: ADDR.cbbtc,
             oracle: ADDR.oracle,
-            collateralRatioBps: 13_699n, // 73% max LTV — Aave v3 Base cbBTC, live via the Graph
+            collateralRatioBps: 13_699n, // 73% max LTV
             maintenanceRatioBps: 12_821n, // 78% liquidation threshold
             rateBps,
             termSeconds: Number(termSeconds),
@@ -590,19 +586,21 @@ function NewDealCard() {
         />
         <span style={{ color: "var(--ink-2)" }}>% ·</span>
         <input
-          style={{ width: 70 }}
-          value={termDays}
-          onChange={(e) => setTermDays(e.target.value.replace(/[^0-9.]/g, ""))}
-          aria-label="term days"
+          style={{ width: 90 }}
+          value={termSecs}
+          onChange={(e) => setTermSecs(e.target.value.replace(/[^0-9]/g, ""))}
+          aria-label="term seconds"
         />
-        <span style={{ color: "var(--ink-2)" }}>day draws ·</span>
+        <span style={{ color: "var(--ink-2)" }} title="420s = 7-minute demo tenor · 7,776,000 = 90 days">
+          sec draws ·
+        </span>
         <input
           style={{ width: 70 }}
           value={availDays}
           onChange={(e) => setAvailDays(e.target.value.replace(/[^0-9.]/g, ""))}
           aria-label="availability days"
         />
-        <span style={{ color: "var(--ink-2)" }}>day availability · Aave-matched margining (LTV 73% / LT 78%)</span>
+        <span style={{ color: "var(--ink-2)" }}>day availability · margining LTV 73% / LT 78%</span>
         <button onClick={publish} disabled={!isConnected || busy}>
           Publish
         </button>
