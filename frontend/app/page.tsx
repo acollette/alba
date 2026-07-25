@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   useAccount,
@@ -39,7 +39,7 @@ const fmt = (v: bigint | undefined, dec: number, digits = 2) =>
   v === undefined ? "—" : Number(formatUnits(v, dec)).toLocaleString("en-US", { maximumFractionDigits: digits });
 
 const STATE_LABEL = ["—", "active", "settled", "auction", "liquidated"] as const;
-type Role = "lender" | "borrower";
+type Role = "lender" | "borrower" | "observer";
 
 function useFacilityId(): `0x${string}` {
   const [id, setId] = useState<`0x${string}`>(DEFAULT_FACILITY_ID);
@@ -52,62 +52,46 @@ function useFacilityId(): `0x${string}` {
 
 export default function Page() {
   const facilityId = useFacilityId();
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { facility } = useFacility(facilityId);
   const lenderAddr = facility?.[1]?.toLowerCase();
   const borrowerAddr = facility?.[2]?.borrower?.toLowerCase();
   const you = address?.toLowerCase();
-  const youAreLender = !!you && you === lenderAddr;
-  const youAreBorrower = !!you && you === borrowerAddr;
-  const isObserver = !!you && !!facility?.[6] && !youAreLender && !youAreBorrower;
 
-  const [role, setRole] = useState<Role>("borrower");
-  const touched = useRef(false);
-  useEffect(() => {
-    if (touched.current) return;
-    if (youAreLender && !youAreBorrower) setRole("lender");
-    if (youAreBorrower) setRole("borrower");
-  }, [youAreLender, youAreBorrower]);
+  // Production semantics: the WALLET decides the role — no toggles, no impersonation.
+  const role: Role = !you
+    ? "observer"
+    : you === lenderAddr
+      ? "lender"
+      : you === borrowerAddr
+        ? "borrower"
+        : "observer";
 
   return (
     <main>
       <Header />
-      <div className="tabs" role="tablist" aria-label="view as">
-        {(["lender", "borrower"] as Role[]).map((r) => (
-          <button
-            key={r}
-            role="tab"
-            aria-selected={role === r}
-            className={role === r ? "active" : ""}
-            onClick={() => {
-              touched.current = true;
-              setRole(r);
-            }}
-          >
-            {r === "lender" ? "Lender" : "Borrower"}
-            {((r === "lender" && youAreLender) || (r === "borrower" && youAreBorrower)) && (
-              <span className="you">YOU</span>
-            )}
-          </button>
-        ))}
+
+      <div className="kv" style={{ margin: "0 0 16px" }}>
+        <span className={`badge ${role !== "observer" ? "ok" : ""}`}>
+          <span className="dot" />
+          {!isConnected
+            ? "connect a wallet — the deal recognizes its parties by address"
+            : role === "lender"
+              ? "viewing as LENDER — your wallet is this facility's lender"
+              : role === "borrower"
+                ? "viewing as BORROWER — this deal was sold to your name"
+                : "observer — this wallet is not a party; read-only"}
+        </span>
       </div>
 
-      {isObserver && (
-        <div className="card" style={{ padding: "10px 16px" }}>
-          <span className="badge">
-            <span className="dot" />
-            observer — this wallet is not a party to this facility; views are read-only
-          </span>
-        </div>
-      )}
-
       <FacilityCard facilityId={facilityId} role={role} />
-      {role === "borrower" ? (
+      {role === "borrower" && (
         <>
           <BorrowerObligations facilityId={facilityId} />
-          <DrawPanel facilityId={facilityId} isParty={youAreBorrower} />
+          <DrawPanel facilityId={facilityId} isParty={true} />
         </>
-      ) : (
+      )}
+      {role === "lender" && (
         <>
           <LenderBook facilityId={facilityId} />
           <NewDealCard />
@@ -666,9 +650,9 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
         )}
       </div>
       <div className="hint">
-        {isParty
-          ? "One transaction: collateral locks in the escrow and the facility's Aqua order pays out — the escrow is the only doorway (_onlyTaker), so drawn funds without locked collateral are structurally impossible."
-          : "Only the named borrower can draw — this deal was sold to one name."}
+        One transaction: collateral locks in the escrow and the facility&apos;s Aqua order pays out — the escrow is
+        the only doorway (<span className="mono">_onlyTaker</span>), so drawn funds without locked collateral are
+        structurally impossible.
       </div>
       {status && <div className="hint">{status}</div>}
       {error && <div className="err">{error}</div>}

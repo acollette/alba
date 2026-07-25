@@ -31,14 +31,14 @@ protocols, zero per-protocol code — and this is how the deal gets priced."
 against cbBTC inventory. They message a desk. Terms agreed in Telegram. We don't
 pretend to replace that."
 
-**Beat 2 — the deal link (app, LENDER wallet):** Lender tab → *New deal*: paste the
+**Beat 2 — the deal link (app, LENDER wallet):** Connect the LENDER wallet (the page renders the lender desk by itself) → *New deal*: paste the
 borrower address, 300k / 4.60% / 90d → **Publish** (3 wallet prompts: approve pull
 rights → ship to Aqua → register). Point at the wallet: "funds never left." Copy the
 deal link — "this is the term sheet now; it goes out in Telegram."
 
-**Beat 3 — accept & draw (switch wallet to BORROWER, open the deal link):** tabs flip,
-"YOU" chip moves to Borrower — "the contract knows who I am; the deal was sold to one
-name." Review terms-as-code → **Accept & approve cbBTC** → set 100000 → **Draw**: one
+**Beat 3 — accept & draw (switch wallet to BORROWER, open the deal link):** the page
+re-renders as the borrower AUTOMATICALLY — no tabs, the wallet IS the role: "the
+contract knows who I am; the deal was sold to one name." Review terms-as-code → **Accept & approve cbBTC** → set 100000 → **Draw**: one
 transaction, collateral in, cash out. Obligations card appears with the health meter.
 
 **Beat 4 — the machine (timeline + explorer tabs):** the EXISTING v6 history — Hedera
@@ -49,7 +49,7 @@ position from pre-authorized funds. Zero penalty. The auction only exists for a 
 borrower — and it stops the moment the lender is whole." If asked for the default path
 live: `forge test --match-contract Test6 -vv` in the terminal.
 
-**Beat 5 — close (lender tab):** the book: receivables, statuses, the settled row.
+**Beat 5 — close (reconnect LENDER wallet):** the book: receivables, statuses, the settled row.
 "Positions are one ERC-721 from a secondary market. Midnight built the bond market —
 we built everything that isn't standard, and made it settle itself."
 
