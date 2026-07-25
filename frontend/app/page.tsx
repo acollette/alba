@@ -913,9 +913,21 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
       }
 
       setStatus("3/6 shipping the CURE leg — your no-penalty liquidation tier…");
-      const cure = await client!.readContract({
+      // Read-after-write across a load-balanced RPC: the receipt can come from one node
+      // and this read hit a lagging one. Poll until the draw is visible everywhere —
+      // shipping a zero-token order would be flagged (rightly) by the wallet.
+      let cure = await client!.readContract({
         abi: escrowAbi, address: ADDR.escrow, functionName: "cureOrder", args: [drawId],
       });
+      for (let tries = 0; cure[0].maker === "0x0000000000000000000000000000000000000000" && tries < 15; tries++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        cure = await client!.readContract({
+          abi: escrowAbi, address: ADDR.escrow, functionName: "cureOrder", args: [drawId],
+        });
+      }
+      if (cure[0].maker === "0x0000000000000000000000000000000000000000") {
+        throw new Error("draw not yet visible on the RPC — wait a few seconds and re-try; the draw itself is safe");
+      }
       await mined(await writeContractAsync({
         abi: aquaAbi, address: AQUA, functionName: "ship",
         args: [ADDR.router, cure[1], [...cure[2]], [...cure[3]]], chainId: CHAIN_ID,
