@@ -47,7 +47,7 @@ docs/                This planning pack
 - `docs/ARCHITECTURE.md` — system design, contracts, flows, trust model
 - `docs/OPCODES.md` — spec for the three custom instructions
 - `docs/PLAN.md` — prep week + 2-day build schedule + priority stack + gates
-- `docs/DEMO.md` — demo script, video plan, qualification checklists per sponsor
+- `docs/DEMO.md` — demo script, presentation plan (live demo + screenshots; video optional), qualification checklists per sponsor
 - `docs/PRICING.md` — desk methodology: curve construction, weighted composite, gap-risk pricing
 - `CLAUDE.md` — execution guide for AI-assisted development
 

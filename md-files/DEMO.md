@@ -44,17 +44,29 @@ Rehearsed Foundry output: cbBTC crashes mid-term → the scheduled sentinel CHEC
 
 ### The Graph — Composable/Standardized
 - [ ] Messari Standardized Lending schema: ONE query pattern across ≥3 protocols (Aave v3, Morpho Blue, Compound v3)
-- [ ] LIVE Graph endpoints at demo/video time — mocked/static data disqualifies
+- [ ] LIVE Graph endpoints at demo time — mocked/static data disqualifies
 - [ ] Separate public MIT repo (`chronos-rates`) with README naming subgraphs + endpoints
-- [ ] 2–4 minute video recorded Day 2 hours 8–10
+- [ ] Graph presentation asset: live dashboard demo + screenshots (2–4 min VIDEO ONLY IF ⚠ the track's submission rules hard-require one — verify at submission; recording is otherwise an optional extra)
 - [ ] Standards leverage stated explicitly on camera: "same query, three protocols, zero per-protocol code"
 
 ### ETHGlobal general
 - [ ] Built during event (prep = throwaway experiments only)
 - [ ] Check event T&Cs at registration for submission licensing requirements
-- [ ] Video(s) + public repos submitted before deadline (set alarm 2h before)
+- [ ] Public repos (+ any assets the submission form requires) submitted before deadline (set alarm 2h before)
 
-## Video plan (Day 2, hours 8–10)
+## Presentation plan (Day 2, hours 8–10) — LIVE DEMO + SCREENSHOTS; video optional
 
-1. **Graph video (2–4 min, required):** the rates service + dashboard, live queries on screen, standards-leverage sentence, how it feeds pricing in the product. Screen recording + voiceover.
-2. **Main video (3–4 min):** the live-demo beats recorded as backup + submission asset. Record the Beat 3 alarm-fire twice — it's the clip that carries everything.
+DECISION: no video recording by default. The demo is given LIVE on the presenter's
+machine in front of the judges, supported by screenshots (evidence pack below).
+
+1. **Live demo:** the beats above, driven from the app (localhost:3001), the rates
+   dashboard (localhost:8787), Axelarscan/Basescan/Hedera mirror tabs pre-opened.
+2. **Screenshot pack (capture Day 2 hours 8–10):** facility card both roles ·
+   dashboard with live curve · timeline with executed schedule IDs · Axelarscan
+   executed GMP messages · the one-tx sentinel-cure log view on Basescan/Blockscout ·
+   green 38-test forge run. Keep in `docs/screenshots/`.
+3. **Optional extra (only if time/desire permits, or if a track's submission form
+   hard-requires video — VERIFY the Graph track rules before submitting):** screen-record
+   the same live flow once as insurance against demo-day network flakiness.
+⚠ Prior plan assumed the Graph track required a 2–4 min video — re-check the actual
+submission requirements; if required, record the minimum viable screen capture.

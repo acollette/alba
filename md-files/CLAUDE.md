@@ -37,5 +37,5 @@ You are assisting on **Alba**: revolving credit facilities + term loans as SwapV
 ## Definition of done (per gate)
 
 - **Day 1:** tests 1–6 green on fork; trigger loop fires end-to-end (real or fallback); 20+ commits.
-- **Day 2 hour 8:** UI demos Beats 1–3; Midnight + Graph lines live; STOP BUILDING → videos, READMEs, rehearsal.
-- **Submission:** both repos public, videos uploaded, checklists in DEMO.md all ticked, submitted ≥2h before deadline.
+- **Day 2 hour 8:** UI demos Beats 1–3; Midnight + Graph lines live; STOP BUILDING → screenshots, READMEs, live-demo rehearsal (video = optional extra only).
+- **Submission:** both repos public, checklists in DEMO.md all ticked (incl. verifying whether any track hard-requires a video), submitted ≥2h before deadline.

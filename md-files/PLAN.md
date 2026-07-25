@@ -48,7 +48,7 @@ No project code before the hackathon (qualification), but throwaway experiments 
 - Dashboard chart: fixed curve + floating band. Graph qualification: LIVE endpoints at demo time — no cached JSON.
 
 **Hours 8–10: STOP BUILDING.**
-- Record The Graph's 2–4 min video (their hard requirement) + general demo video.
+- Presentation prep: live-demo choreography + screenshot pack (NO video by default — optional extra; verify whether the Graph track's submission form hard-requires one).
 - READMEs finalized (Graph repo must name the subgraphs/endpoints consumed; one sentence: "same query, three protocols, zero per-protocol code").
 - Rehearse live demo ×2. Pre-warm fork, pre-fund wallets, terminal windows arranged. Default-path demo = rehearsed Foundry test output with narration (more reliable than live UI theater).
 
