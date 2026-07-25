@@ -44,6 +44,7 @@ contract CollateralEscrow {
     error FacilityUnknown(bytes32 facilityId);
     error OnlyFacilityLender(address caller, address lender);
     error OnlyFacilityBorrower(address caller, address borrower);
+    error SelfFacingFacility(address lenderAndBorrower);
     error DrawAlreadyExists(bytes32 drawId);
     error DrawNotLocked(bytes32 drawId);
     error DrawHealthy(bytes32 drawId, uint256 collateralValue, uint256 requiredValue);
@@ -172,6 +173,7 @@ contract CollateralEscrow {
     function registerFacility(bytes32 facilityId, ISwapVM.Order calldata order, FacilityParams calldata p) external {
         require(!facilities[facilityId].exists, FacilityAlreadyRegistered(facilityId));
         require(msg.sender == order.maker, OnlyFacilityLender(msg.sender, order.maker));
+        require(p.borrower != msg.sender, SelfFacingFacility(msg.sender)); // a deal needs two names
         facilities[facilityId] = Facility({
             order: order,
             lender: msg.sender,

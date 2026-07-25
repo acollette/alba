@@ -31,7 +31,9 @@ contract LiveWiring is Script {
 
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
+        uint256 borrowerPk = vm.envUint("BORROWER_PK");
         address me = vm.addr(pk);
+        address borrower = vm.addr(borrowerPk);
         IAqua aqua = IAqua(vm.envAddress("AQUA_BS"));
         string memory triggerAddrStr = vm.envString("TRIGGER_ADDR_STR");
 
@@ -82,9 +84,13 @@ contract LiveWiring is Script {
             })
         );
 
-        // Atomic collateralized draw: collateral in, cash out, one tx (borrower = me)
-        cbbtc.mint(me, COLLAT1);
+        vm.stopBroadcast();
+
+        // ---- borrower side: their own wallet, their own signatures
+        vm.startBroadcast(borrowerPk);
         cbbtc.approve(address(escrow), type(uint256).max);
+        usdc.approve(address(aqua), type(uint256).max);
+        // Atomic collateralized draw: collateral in, cash out, one tx
         escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
 
         // Ship the CURE leg (opt-in, no-penalty liquidation tier) + the maturity leg
@@ -94,6 +100,7 @@ contract LiveWiring is Script {
 
         (,,,,,,, uint40 maturity,) = escrow.draws(bytes32(uint256(1)));
         uint256 repayment = escrow.repaymentOf(bytes32(uint256(1)));
+        maturity; repayment; // logged below
         (
             ISwapVM.Order memory maturityOrder,
             bytes memory mStrategy,
@@ -101,7 +108,7 @@ contract LiveWiring is Script {
             uint256[] memory mAmounts
         ) = builder.buildMaturityLeg(
             AlbaProgramBuilder.PullLegTerms({
-                maker: me,
+                maker: borrower,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
                 amount: repayment,

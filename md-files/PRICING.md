@@ -63,6 +63,25 @@ Current live build-up at 90d (benchmark ≈ 3.5%): benchmark + 25bps residual +
 50bps liquidity ≈ **4.2% model rate**; the demo facility quotes **4.60%** — a
 realistic bilateral margin over model.
 
+## Reading the spread (benchmark 3.5% → facility 4.60%): three products, not one margin
+
+1. **The benchmark is a shadow price, not an executable one.** The 90d point is a labeled
+   flat-forward extrapolation from 35d — Midnight currently has NO executable 90d
+   liquidity (books past 63d are dust). Alba's quote is the only executable 90d
+   cbBTC/USDC rate in existence; a spread to a non-tradeable reference is not "width".
+2. **Committed capacity ≠ spot borrowing.** A facility sells the borrower a free
+   drawdown option — draw at 4.60% whenever, even after rates gap higher. TradFi prices
+   that separately (commitment fee on undrawn, typically 30–50% of margin, PLUS drawn
+   margin). Alba charges no commitment fee, so the option premium lives in the all-in
+   drawn rate. Roadmap refinement: split into drawn margin + explicit undrawn
+   commitment fee — the drawn rate then sits nearly on the model.
+3. **The model's 75bps** = 25bps residual (younger liquidator network, between-check
+   jumps) + 50bps lender illiquidity (bespoke, non-fungible position — no exit until
+   the position NFT ships).
+
+Calibration: IG TradFi revolvers run benchmark +100–200bps drawn plus undrawn fees.
+At +109bps all-in with no undrawn fee, Alba prices TIGHT for the product class.
+
 ## Parameters (all configurable via /api/quote)
 
 | Param | Default | Note |

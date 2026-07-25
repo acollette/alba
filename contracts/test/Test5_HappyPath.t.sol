@@ -213,6 +213,38 @@ contract Test5_HappyPath is Test {
         escrow.release(bytes32(uint256(9)));
     }
 
+    function test_RegisterFacility_SelfFacingReverts() public {
+        (ISwapVM.Order memory selfOrder, bytes memory strategy,,) = builder.buildFacilityLeg(
+            AlbaProgramBuilder.PullLegTerms({
+                maker: lender,
+                counterToken: address(cbbtc),
+                pullToken: address(usdc),
+                amount: FACILITY,
+                salt: 99
+            }),
+            address(escrow)
+        );
+        strategy; // unused
+        vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.SelfFacingFacility.selector, lender));
+        vm.prank(lender);
+        escrow.registerFacility(
+            bytes32(uint256(0xBAD)),
+            selfOrder,
+            CollateralEscrow.FacilityParams({
+                borrower: lender, // same name on both sides — must be rejected
+                loanToken: IERC20(address(usdc)),
+                collateralToken: IERC20(address(cbbtc)),
+                oracle: oracle,
+                collateralRatioBps: COLLATERAL_RATIO_BPS,
+                maintenanceRatioBps: MAINTENANCE_RATIO_BPS,
+                rateBps: RATE_BPS,
+                termSeconds: uint40(TERM),
+                auctionDuration: 3600,
+                auctionDecay: 0.99994e18
+            })
+        );
+    }
+
     function test_Draw_NamedBorrowerOnly() public {
         address stranger = makeAddr("stranger");
         cbbtc.mint(stranger, 5e8);
