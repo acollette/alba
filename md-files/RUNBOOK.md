@@ -32,7 +32,11 @@ Browser tabs, in story order (v10 stack / v11 trigger):
 Spares: router `0x67bC67135A153EEAFDbF352f70EbaA0428d6636b` · executor
 `0x81C35F38B209e7F4A025588cb93be8b51c3897E4` · builder `0x99928dACccf994868bC9ba80de0B47c8DA54151B`
 · oracle `0xeBcC1E49Fb8AeBF95C9653821783e4887ae3aD45`.
-Wallet: both accounts imported, Base Sepolia selected. Terminal visible for Beat 4.
+
+Wallet: both accounts imported, Base Sepolia selected, and IMPORT THE v10 TOKENS so
+balances show: USDC `0x9EB96112863ad3286e1f893532c676838D44E393` (6 dec) · cbBTC
+`0x2E08FE4EF972DD20dCCdA57066d7735Ae8aF55d2` (8 dec). Balances: lender 400k USDC,
+borrower ~10k USDC + 2.13 cbBTC. Terminal visible for Beat 4.
 
 ## The story → the clicks
 
@@ -55,13 +59,16 @@ re-renders as the borrower AUTOMATICALLY — no tabs, the wallet IS the role: "t
 contract knows who I am; the deal was sold to one name." Review terms-as-code → **Accept & approve cbBTC** → set 100000 → **Draw**: one
 transaction, collateral in, cash out. Obligations card appears with the health meter.
 
-**Beat 4 — the machine (timeline + explorer tabs):** the EXISTING v6 history — Hedera
-schedule IDs "executed by the network", the settled draw with interest exact to six
-decimals (`0xfb74e7ca…deff`: lender +100,000.061263), and the sentinel-cure tx
-(`0xb6e9d53d…d284`): "price crashed 20% — the network noticed on schedule and CURED the
-position from pre-authorized funds. Zero penalty. The auction only exists for a drained
-borrower — and it stops the moment the lender is whole." If asked for the default path
-live: `forge test --match-contract Test6 -vv` in the terminal.
+**Beat 4 — the machine (timeline + explorer tabs):** the run-#9 history already on this
+stack — Hedera schedule `0.0.9751046` "executed by the network" (HashScan), the Axelar
+message hedera→base (executed), and the settle tx
+`0x51057c09ecc8eaff85e2f56a064b1ad65ab7ebccad3968d553225b548e92b8c7`: lender
++100,000.061263 — interest exact to six decimals, capacity refilled 200k→300k in the
+same tx. For the sentinel cure, narrate from STATUS/screenshots (it lives on an earlier
+stack): "price crashed 20% — the network noticed on schedule and CURED the position from
+pre-authorized funds. Zero penalty. The auction only exists for a drained borrower — and
+it stops the moment the lender is whole." If asked for the default path live:
+`forge test --match-contract Test6 -vv` in the terminal.
 
 **Beat 5 — close (reconnect LENDER wallet):** the book: receivables, statuses, the settled row.
 "Positions are one ERC-721 from a secondary market. Midnight built the bond market —
