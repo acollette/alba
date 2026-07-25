@@ -612,7 +612,9 @@ function NewDealCard() {
       const grossCeiling = sizeUnits * 4n; // Aqua safety rail; the escrow meters revolving capacity
       const rateBps = BigInt(Math.round(Number(ratePct) * 100));
       const termSeconds = BigInt(Math.round(Number(termSecs)));
-      const salt = BigInt(Date.now());
+      // Small ID so every facility displays as "#NNNNN" (a duplicate reverts loudly
+      // on-chain — registerFacility rejects existing ids, Aqua rejects re-ships)
+      const salt = BigInt(10_000 + Math.floor(Math.random() * 90_000));
       const facilityId = toHex(salt, { size: 32 });
 
       setStatus("1/3 approving USDC to Aqua (pull rights, funds stay put)…");
@@ -841,7 +843,8 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
     setError("");
     try {
       setStatus("drawing — collateral in, cash out, one transaction…");
-      const drawId = toHex(BigInt(Date.now()), { size: 32 });
+      // Small ID → renders "#NNNNN" like script-made draws; duplicates revert on-chain
+      const drawId = toHex(BigInt(10_000 + Math.floor(Math.random() * 90_000)), { size: 32 });
       await writeContractAsync({
         abi: escrowAbi,
         address: ADDR.escrow,
