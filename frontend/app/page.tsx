@@ -99,6 +99,7 @@ function DeskOverview() {
                 <th>commitment</th>
                 <th>outstanding</th>
                 <th>rate</th>
+                <th>term</th>
                 <th>availability</th>
                 <th>status</th>
               </tr>
@@ -116,6 +117,7 @@ function DeskOverview() {
                   <td>{fmt(f.commitment, USDC_DEC, 0)}</td>
                   <td>{fmt(f.outstanding, USDC_DEC, 0)}</td>
                   <td>{(f.rateBps / 100).toFixed(2)}%</td>
+                  <td>{f.termSeconds >= 86400 ? `${Math.round(f.termSeconds / 86400)}d` : `${f.termSeconds}s`}</td>
                   <td>{new Date(f.availabilityEnd * 1000).toLocaleDateString()}</td>
                   <td>
                     <span className={`badge ${f.status === "active" ? "ok" : ""}`}>
@@ -149,6 +151,7 @@ type FacilityRow = {
   commitment: bigint;
   outstanding: bigint;
   rateBps: number;
+  termSeconds: number;
   availabilityEnd: number;
   status: "active" | "standing by" | "closed";
   you: "lender" | "borrower" | null;
@@ -181,6 +184,7 @@ function useAllFacilities() {
             commitment: p.commitment,
             outstanding,
             rateBps: Number(p.rateBps),
+            termSeconds: Number(p.termSeconds),
             availabilityEnd: Number(p.availabilityEnd),
             status: outstanding > 0n ? "active" : open ? "standing by" : "closed",
             you:
