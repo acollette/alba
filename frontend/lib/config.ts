@@ -16,7 +16,7 @@ export const CHAIN_ID = 84532; // Base Sepolia — reads pinned here regardless 
 
 export const FACILITY_SIZE = BigInt(process.env.NEXT_PUBLIC_FACILITY_SIZE ?? "300000000000"); // 300k USDC (6 dec)
 
-export const START_BLOCK = BigInt(process.env.NEXT_PUBLIC_START_BLOCK ?? "44612900");
+export const START_BLOCK = BigInt(process.env.NEXT_PUBLIC_START_BLOCK ?? "44606948");
 
 export const RATES_API = process.env.NEXT_PUBLIC_RATES_API ?? "http://localhost:8787";
 
