@@ -49,6 +49,7 @@ contract CollateralEscrow {
     error SelfFacingFacility(address lenderAndBorrower);
     error FacilityCommitmentExceeded(uint256 outstanding, uint256 requested, uint256 commitment);
     error AvailabilityExpired(uint40 availabilityEnd);
+    error WithdrawBreaksInitialMargin(uint256 value, uint256 required);
     error DrawAlreadyExists(bytes32 drawId);
     error DrawNotLocked(bytes32 drawId);
     error DrawHealthy(bytes32 drawId, uint256 collateralValue, uint256 requiredValue);
@@ -118,6 +119,8 @@ contract CollateralEscrow {
         bytes32 indexed facilityId, bytes32 indexed drawId, address indexed borrower, uint256 amount, uint256 collateral
     );
     event CollateralLocked(bytes32 indexed drawId, address indexed borrower, address token, uint256 amount);
+    event CollateralToppedUp(bytes32 indexed drawId, uint256 amount, uint256 totalCollateral);
+    event CollateralWithdrawn(bytes32 indexed drawId, uint256 amount, uint256 totalCollateral);
     event CollateralReleased(bytes32 indexed drawId, address indexed borrower, uint256 amount);
     event RepaymentRecycled(bytes32 indexed drawId, bytes32 indexed facilityId, uint256 amount, bool intoStrategy);
     event DrawCured(bytes32 indexed drawId, uint256 amountPulled, bool fullClose);
@@ -211,7 +214,9 @@ contract CollateralEscrow {
     /// pull in the same transaction, loan proceeds straight to the borrower. Maturity and
     /// repayment derive from the facility's immutable terms.
     /// @dev Collateral only locks per-draw: publishing/undrawn capacity costs the borrower nothing.
-    function draw(bytes32 facilityId, bytes32 drawId, uint256 amount)
+    /// @param extraCollateral Voluntary over-collateralization on top of the required
+    /// initial margin — posts a lower LTV and a lower liquidation price from day one.
+    function draw(bytes32 facilityId, bytes32 drawId, uint256 amount, uint256 extraCollateral)
         external
         nonReentrant
         returns (uint256 collateral)
@@ -230,7 +235,7 @@ contract CollateralEscrow {
         );
         outstandingOf[facilityId] += amount;
 
-        collateral = collateralForDraw(facilityId, amount);
+        collateral = collateralForDraw(facilityId, amount) + extraCollateral;
         draws[drawId] = Draw({
             facilityId: facilityId,
             borrower: msg.sender,
@@ -397,6 +402,32 @@ contract CollateralEscrow {
     }
 
     // ---------------------------------------------------------------- settlement-path exits
+
+    /// @notice Post additional collateral on a live draw — the standard "move my
+    /// liquidation price down" lever. Borrower-only, any time while LOCKED.
+    function topUpCollateral(bytes32 drawId, uint256 amount) external nonReentrant {
+        Draw storage d = draws[drawId];
+        require(d.state == DrawState.LOCKED, DrawNotLocked(drawId));
+        require(msg.sender == d.borrower, OnlyFacilityBorrower(msg.sender, d.borrower));
+        d.amount += amount;
+        d.token.safeTransferFrom(msg.sender, address(this), amount);
+        emit CollateralToppedUp(drawId, amount, d.amount);
+    }
+
+    /// @notice Withdraw excess collateral — allowed only down to the INITIAL ratio
+    /// (stricter than the liquidation threshold, standard margining UX).
+    function withdrawCollateral(bytes32 drawId, uint256 amount) external nonReentrant {
+        Draw storage d = draws[drawId];
+        require(d.state == DrawState.LOCKED, DrawNotLocked(drawId));
+        require(msg.sender == d.borrower, OnlyFacilityBorrower(msg.sender, d.borrower));
+        d.amount -= amount;
+        Facility storage f = facilities[d.facilityId];
+        uint256 value = collateralValueInLoan(drawId);
+        uint256 required = (debtOf(drawId) * f.params.collateralRatioBps) / 10_000;
+        require(value >= required, WithdrawBreaksInitialMargin(value, required));
+        d.token.safeTransfer(msg.sender, amount);
+        emit CollateralWithdrawn(drawId, amount, d.amount);
+    }
 
     /// @notice Return collateral to the borrower after a successful repayment settlement.
     function release(bytes32 drawId) external onlyExecutor {

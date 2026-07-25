@@ -143,7 +143,7 @@ contract Test5_HappyPath is Test {
         returns (ISwapVM.Order memory maturityOrder, uint40 maturity, uint256 repayment)
     {
         vm.prank(borrower);
-        uint256 locked = escrow.draw(FACILITY_ID, bytes32(drawId), drawAmount);
+        uint256 locked = escrow.draw(FACILITY_ID, bytes32(drawId), drawAmount, 0);
         assertEq(locked, collateral, "pro-rata collateral mismatch");
         (,,,,,,, maturity,) = escrow.draws(bytes32(drawId)); // maturity set by the escrow (facility term)
 
@@ -201,7 +201,7 @@ contract Test5_HappyPath is Test {
         oracle.setAnswer(100_000e8); // fresh mark post-warp (staleness guard is live)
         uint256 usdcBefore = usdc.balanceOf(borrower);
         vm.prank(borrower);
-        escrow.draw(FACILITY_ID, bytes32(uint256(3)), 150_000e6);
+        escrow.draw(FACILITY_ID, bytes32(uint256(3)), 150_000e6, 0);
         assertEq(usdc.balanceOf(borrower) - usdcBefore, 150_000e6, "remaining capacity not drawable");
         assertEq(router.coveredAmount(lender, facilityHash), FACILITY, "facility should now be fully drawn");
     }
@@ -231,18 +231,18 @@ contract Test5_HappyPath is Test {
         // genuine revolver can do this
         oracle.setAnswer(100_000e8); // fresh mark post-warp
         vm.prank(borrower);
-        escrow.draw(FACILITY_ID, bytes32(uint256(2)), FACILITY);
+        escrow.draw(FACILITY_ID, bytes32(uint256(2)), FACILITY, 0);
         assertEq(escrow.availableToDraw(FACILITY_ID), 0, "fully drawn again after replenishment");
     }
 
     function test_Draw_CommitmentGate() public {
         vm.prank(borrower);
-        escrow.draw(FACILITY_ID, bytes32(uint256(1)), FACILITY);
+        escrow.draw(FACILITY_ID, bytes32(uint256(1)), FACILITY, 0);
         vm.expectRevert(
             abi.encodeWithSelector(CollateralEscrow.FacilityCommitmentExceeded.selector, FACILITY, 1e6, FACILITY)
         );
         vm.prank(borrower);
-        escrow.draw(FACILITY_ID, bytes32(uint256(2)), 1e6);
+        escrow.draw(FACILITY_ID, bytes32(uint256(2)), 1e6, 0);
     }
 
     function test_Draw_AvailabilityExpires() public {
@@ -252,12 +252,12 @@ contract Test5_HappyPath is Test {
         (,, CollateralEscrow.FacilityParams memory p,,,,) = escrow.facilities(FACILITY_ID);
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.AvailabilityExpired.selector, p.availabilityEnd));
         vm.prank(borrower);
-        escrow.draw(FACILITY_ID, bytes32(uint256(1)), 1_000e6);
+        escrow.draw(FACILITY_ID, bytes32(uint256(1)), 1_000e6, 0);
     }
 
     function test_Release_OnlyExecutor() public {
         vm.prank(borrower);
-        escrow.draw(FACILITY_ID, bytes32(uint256(9)), 10_000e6);
+        escrow.draw(FACILITY_ID, bytes32(uint256(9)), 10_000e6, 0);
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyExecutor.selector, borrower));
         vm.prank(borrower);
@@ -306,7 +306,7 @@ contract Test5_HappyPath is Test {
 
         vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.OnlyFacilityBorrower.selector, stranger, borrower));
         vm.prank(stranger);
-        escrow.draw(FACILITY_ID, bytes32(uint256(77)), 1_000e6);
+        escrow.draw(FACILITY_ID, bytes32(uint256(77)), 1_000e6, 0);
     }
 
     function test_Draw_OnlyViaEscrow_StrangerCannotDrawUncollateralized() public {

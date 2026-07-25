@@ -193,3 +193,32 @@ Builder `0xB84a8eaCaa349A50e9F7C87e2aDbF7EaC98DEa1c` · Executor
 · cbBTC `0x3a53c0117Edfc8E745f7254F75d11e5085E210a8` · Oracle
 `0x869105F636D6Ac7fDa4E49B6787359E114c96Ddb` · Hedera trigger v7
 `0xe636135Bc58B5c732479B3303425C47653B8801f`. Frontend defaults point here.
+
+## LIVE RUN #6 ✅ — THE REVOLVER REVOLVES ON-CHAIN
+
+Stack v7: after the Hedera-scheduled settlement executed (Base Sepolia block 44,606,624,
+tx `0xf064dcbbeb2e94fbc8e38c4e0e26d67e94e47af656bbef036db277fb1bdd6229`),
+`availableToDraw` snapped from 200,000 back to the FULL 300,000 commitment — the
+repayment recycled into the lender's facility strategy via Aqua `push` (lender paid the
+real USDC in the same call that refilled pullable capacity). Repayment replenishes
+capacity: observed live, not just tested (fork proof: cumulative 400k drawn on a 300k
+commitment, 41→44 tests).
+
+## Margining upgrade (44/44 tests)
+
+- **Real-facility mechanics:** on-chain `commitment` + `availabilityEnd` (the
+  commitment's own term, like a 364-day revolver); escrow meters outstanding principal;
+  `_stopWhenCovered` demoted to a 4× gross safety rail.
+- **DeFi-precise terms in the UI:** max LTV 76.9% (post ≥130%) · liquidation threshold
+  87.0% LTV (<115%) · per-draw liquidation PRICE displayed and previewed at draw time.
+- **Borrower margin controls:** voluntary extra collateral at draw, `topUpCollateral`
+  (moves the liquidation price down — tested: a topped-up position survives a crash that
+  breaches the minimum-margin one), `withdrawCollateral` gated at the INITIAL ratio.
+
+**Current live stack (v8):** Router `0x973aB7E04dBAc82255d94f11F8FB2518b4Fd9dAE` ·
+Builder `0x3AE1b534f15966C815FaCA58eCf368a806488232` · Executor
+`0x4173d77703566F99909cC1485cb6B9C04F32D492` · Escrow
+`0xFC4D35C361fD5D0518a116ab56d2E4181ebf59ec` · USDC `0xc0832552c1cc746eba1B2fAC11484AAe1d943Dc0`
+· cbBTC `0x23391447bE5122149fE370102515226cE799Ab2D` · Oracle
+`0xf38939758b0074CE6e80E1206AD56F4Aef872237` · Hedera trigger v9
+`0x952dE361ae3392A483049517088c51C2618DFD18` (SETTLE scheduled). Frontend on v8.

@@ -69,8 +69,14 @@ export const escrowAbi = [
       { name: "facilityId", type: "bytes32" },
       { name: "drawId", type: "bytes32" },
       { name: "amount", type: "uint256" },
+      { name: "extraCollateral", type: "uint256" },
     ],
     outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function", name: "topUpCollateral", stateMutability: "nonpayable",
+    inputs: [{ name: "drawId", type: "bytes32" }, { name: "amount", type: "uint256" }],
+    outputs: [],
   },
   {
     type: "event", name: "Drawn",

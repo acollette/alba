@@ -103,7 +103,7 @@ contract Test8_ContinuousLiquidation is Test {
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
-        escrow.draw(FACILITY_ID, DRAW_ID, DRAW1);
+        escrow.draw(FACILITY_ID, DRAW_ID, DRAW1, 0);
 
         // Opt into no-penalty cures: ship the deterministic cure leg the escrow derives
         (, bytes memory cStrategy, address[] memory cTokens, uint256[] memory cAmounts) = escrow.cureOrder(DRAW_ID);
@@ -130,6 +130,53 @@ contract Test8_ContinuousLiquidation is Test {
     function _crash() internal {
         // 100k → 80k: collateral value 104k < 115% × ~100k debt — breached
         oracle.setAnswer(80_000e8);
+    }
+
+    function test_ExtraCollateral_LowersLiquidationPrice() public {
+        // Second draw posted with voluntary over-collateralization: +0.5 cbBTC
+        cbbtc.mint(borrower, 1.8e8);
+        vm.prank(borrower);
+        escrow.draw(FACILITY_ID, bytes32(uint256(2)), 50_000e6, 0.5e8);
+        (,,, uint256 total,,,,,) = escrow.draws(bytes32(uint256(2)));
+        assertEq(total, 0.65e8 + 0.5e8, "required initial margin + voluntary extra");
+
+        // A crash that breaches the minimum-margin draw leaves the padded one healthy
+        oracle.setAnswer(80_000e8);
+        (bool healthy1,,) = escrow.isHealthy(DRAW_ID);
+        (bool healthy2,,) = escrow.isHealthy(bytes32(uint256(2)));
+        assertFalse(healthy1, "minimum-margin draw breaches at 80k");
+        assertTrue(healthy2, "over-collateralized draw survives the same crash");
+    }
+
+    function test_TopUp_PreventsLiquidation() public {
+        // Borrower sees trouble coming and tops up BEFORE the crash
+        cbbtc.mint(borrower, 0.4e8);
+        vm.prank(borrower);
+        escrow.topUpCollateral(DRAW_ID, 0.4e8);
+
+        oracle.setAnswer(80_000e8); // would breach the original 1.3 lot: 104k < 115k
+        (bool healthy, uint256 value,) = escrow.isHealthy(DRAW_ID);
+        assertTrue(healthy, "1.7 cbBTC x 80k = 136k covers 115% x 100k");
+        assertEq(value, 136_000e6);
+        vm.expectRevert(); // DrawHealthy — liquidation cannot touch a topped-up position
+        escrow.liquidate(DRAW_ID);
+    }
+
+    function test_WithdrawCollateral_OnlyDownToInitialRatio() public {
+        cbbtc.mint(borrower, 0.5e8);
+        vm.prank(borrower);
+        escrow.topUpCollateral(DRAW_ID, 0.5e8); // 1.8 total; initial requirement 1.3
+
+        vm.prank(borrower);
+        escrow.withdrawCollateral(DRAW_ID, 0.5e8); // back to exactly the initial margin
+        (,,, uint256 total,,,,,) = escrow.draws(DRAW_ID);
+        assertEq(total, 1.3e8);
+
+        // One more sat below the initial ratio must fail — withdrawals are gated at 130%,
+        // not at the 115% liquidation threshold
+        vm.expectRevert();
+        vm.prank(borrower);
+        escrow.withdrawCollateral(DRAW_ID, 0.1e8);
     }
 
     function test_Liquidate_HealthyReverts() public {

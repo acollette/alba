@@ -121,7 +121,7 @@ contract Test7_AxelarWiring is Test {
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
-        escrow.draw(bytes32(uint256(0xFAC)), DRAW_ID, DRAW1);
+        escrow.draw(bytes32(uint256(0xFAC)), DRAW_ID, DRAW1, 0);
         vm.stopPrank();
         (,,,,,,, maturity,) = escrow.draws(DRAW_ID);
         vm.startPrank(borrower);

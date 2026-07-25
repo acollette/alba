@@ -299,12 +299,16 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
             {term !== undefined ? (term >= 86400 ? `${Math.round(term / 86400)}d` : `${term}s`) : "—"}
           </b>
         </span>
-        <span>
-          margining{" "}
+        <span title="collateral factor — the required initial margin">
+          max LTV{" "}
           <b className="num">
-            {params
-              ? `${Number(params.collateralRatioBps) / 100}% / ${Number(params.maintenanceRatioBps) / 100}%`
-              : "—"}
+            {params ? `${(1e6 / Number(params.collateralRatioBps)).toFixed(1)}% (post ≥${Number(params.collateralRatioBps) / 100}%)` : "—"}
+          </b>
+        </span>
+        <span title="liquidation threshold — below this the cure→auction waterfall runs">
+          liq. threshold{" "}
+          <b className="num">
+            {params ? `${(1e6 / Number(params.maintenanceRatioBps)).toFixed(1)}% LTV (<${Number(params.maintenanceRatioBps) / 100}%)` : "—"}
           </b>
         </span>
         <span>
@@ -384,9 +388,16 @@ function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
               <div style={{ width: `${Math.min(100, ratio * 66.7).toFixed(1)}%` }} />
             </div>
             <div className="hint">
-              collateral covers <b className="num">{(ratio * 115).toFixed(0)}%</b> of debt · maintenance floor 115% ·
-              breach first meets a CURE from your authorized funds, never a fire sale
+              collateral covers <b className="num">{(ratio * 115).toFixed(0)}%</b> of debt · liquidation price{" "}
+              <b className="num">
+                $
+                {((Number(d.debt) / 1e6) * 1.15 / (Number(d.collateral) / 1e8)).toLocaleString("en-US", {
+                  maximumFractionDigits: 0,
+                })}
+              </b>{" "}
+              · breach first meets a CURE from your authorized funds, never a fire sale
             </div>
+            <TopUp drawId={d.drawId} />
           </div>
         );
       })}
@@ -588,9 +599,47 @@ function NewDealCard() {
   );
 }
 
+function TopUp({ drawId }: { drawId: `0x${string}` }) {
+  const [amt, setAmt] = useState("");
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [note, setNote] = useState("");
+  async function go() {
+    try {
+      setNote("topping up — your liquidation price moves down…");
+      await writeContractAsync({
+        abi: escrowAbi,
+        address: ADDR.escrow,
+        functionName: "topUpCollateral",
+        args: [drawId, parseUnits(amt || "0", CBBTC_DEC)],
+        chainId: CHAIN_ID,
+      });
+      setNote("topped up ✓");
+      setAmt("");
+    } catch (e: unknown) {
+      setNote(String((e as Error).message ?? e).slice(0, 120));
+    }
+  }
+  return (
+    <div className="row" style={{ alignItems: "center", marginTop: 6 }}>
+      <input
+        style={{ width: 110 }}
+        placeholder="cbBTC"
+        value={amt}
+        onChange={(e) => setAmt(e.target.value.replace(/[^0-9.]/g, ""))}
+        aria-label="top-up collateral amount"
+      />
+      <button className="ghost" onClick={go} disabled={isPending || !amt}>
+        Top up collateral
+      </button>
+      {note && <span className="hint" style={{ marginTop: 0 }}>{note}</span>}
+    </div>
+  );
+}
+
 function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty: boolean }) {
   const { isConnected, address } = useAccount();
   const [amount, setAmount] = useState("25000");
+  const [extra, setExtra] = useState("0");
   const { writeContractAsync, isPending } = useWriteContract();
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -602,6 +651,13 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
       return 0n;
     }
   }, [amount]);
+  const extraUnits = useMemo(() => {
+    try {
+      return parseUnits(extra || "0", CBBTC_DEC);
+    } catch {
+      return 0n;
+    }
+  }, [extra]);
 
   const collateral = useReadContract({
     abi: escrowAbi,
@@ -621,8 +677,13 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
     query: { enabled: !!address, refetchInterval: 8000 },
   });
 
+  const totalCollateral = collateral.data !== undefined ? collateral.data + extraUnits : undefined;
+  const liqPreview =
+    totalCollateral && totalCollateral > 0n && amountUnits > 0n
+      ? ((Number(amountUnits) / 1e6) * 1.15) / (Number(totalCollateral) / 1e8)
+      : undefined;
   const needsApproval =
-    collateral.data !== undefined && allowance.data !== undefined && allowance.data < collateral.data;
+    totalCollateral !== undefined && allowance.data !== undefined && allowance.data < totalCollateral;
 
   async function onApprove() {
     setError("");
@@ -632,7 +693,7 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
         abi: erc20Abi,
         address: ADDR.cbbtc,
         functionName: "approve",
-        args: [ADDR.escrow, collateral.data! * 2n],
+        args: [ADDR.escrow, totalCollateral! * 2n],
         chainId: CHAIN_ID,
       });
       setStatus("accepted — you can draw whenever you need the cash");
@@ -651,7 +712,7 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
         abi: escrowAbi,
         address: ADDR.escrow,
         functionName: "draw",
-        args: [facilityId, drawId, amountUnits],
+        args: [facilityId, drawId, amountUnits, extraUnits],
         chainId: CHAIN_ID,
       });
       setStatus(`drawn ✓ drawId ${drawId.slice(0, 10)}…`);
@@ -673,7 +734,19 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
         />
         <span style={{ color: "var(--ink-2)" }}>USDC</span>
         <span style={{ color: "var(--ink-3)" }}>
-          requires <b className="num">{fmt(collateral.data, CBBTC_DEC, 4)}</b> cbBTC at the live oracle mark
+          requires <b className="num">{fmt(collateral.data, CBBTC_DEC, 4)}</b> cbBTC · extra
+        </span>
+        <input
+          style={{ width: 90 }}
+          value={extra}
+          onChange={(e) => setExtra(e.target.value.replace(/[^0-9.]/g, ""))}
+          aria-label="voluntary extra collateral"
+        />
+        <span style={{ color: "var(--ink-3)" }}>
+          cbBTC → liq. price{" "}
+          <b className="num">
+            {liqPreview ? `$${liqPreview.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
+          </b>
         </span>
         {needsApproval ? (
           <button onClick={onApprove} disabled={!isConnected || isPending}>

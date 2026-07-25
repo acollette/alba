@@ -99,7 +99,7 @@ contract LiveWiring is Script {
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(aqua), type(uint256).max);
         // Atomic collateralized draw: collateral in, cash out, one tx
-        escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
+        escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1, 0);
 
         // Ship the CURE leg (opt-in, no-penalty liquidation tier) + the maturity leg
         (, bytes memory cStrategy, address[] memory cTokens, uint256[] memory cAmounts) =

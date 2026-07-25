@@ -109,7 +109,7 @@ contract Test6_DefaultPath is Test {
         vm.startPrank(borrower);
         cbbtc.approve(address(escrow), type(uint256).max);
         usdc.approve(address(AQUA), type(uint256).max);
-        escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1);
+        escrow.draw(bytes32(uint256(0xFAC)), bytes32(uint256(1)), DRAW1, 0);
         vm.stopPrank();
         (,,,,,,, maturity,) = escrow.draws(bytes32(uint256(1)));
         vm.startPrank(borrower);
