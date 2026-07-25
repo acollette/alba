@@ -65,17 +65,136 @@ async function scanEvents(client: any, eventName: string, from: bigint, to: bigi
 }
 type Role = "lender" | "borrower" | "observer";
 
-function useFacilityId(): `0x${string}` {
-  const [id, setId] = useState<`0x${string}`>(DEFAULT_FACILITY_ID);
+function useFacilityParam(): { ready: boolean; id: `0x${string}` | null } {
+  const [state, setState] = useState<{ ready: boolean; id: `0x${string}` | null }>({ ready: false, id: null });
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("facility");
-    if (q && /^0x[0-9a-fA-F]{64}$/.test(q)) setId(q as `0x${string}`);
+    setState({ ready: true, id: q && /^0x[0-9a-fA-F]{64}$/.test(q) ? (q as `0x${string}`) : null });
   }, []);
-  return id;
+  return state;
 }
 
 export default function Page() {
-  const facilityId = useFacilityId();
+  const { ready, id } = useFacilityParam();
+  if (!ready) return <main />;
+  return id ? <DealPage facilityId={id} /> : <DeskOverview />;
+}
+
+/// The aggregate view: every facility on the desk — ongoing and past — plus the
+/// global machine timeline. Each row opens the shareable single-deal page.
+function DeskOverview() {
+  const { isConnected } = useAccount();
+  const facilities = useAllFacilities();
+  return (
+    <main>
+      <Header />
+      <section className="card">
+        <h2>Facilities — the desk</h2>
+        {facilities.data?.length ? (
+          <table className="list">
+            <thead>
+              <tr>
+                <th>facility</th>
+                <th>lender</th>
+                <th>borrower</th>
+                <th>commitment</th>
+                <th>outstanding</th>
+                <th>rate</th>
+                <th>availability</th>
+                <th>status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {facilities.data.map((f) => (
+                <tr key={f.id}>
+                  <td className="mono">
+                    <a href={`/?facility=${f.id}`} title="open the deal page (shareable link)">
+                      {fmtDrawId(f.id)} ↗
+                    </a>
+                  </td>
+                  <td className="mono">{f.lender.slice(0, 6)}…{f.you === "lender" ? " (you)" : ""}</td>
+                  <td className="mono">{f.borrower.slice(0, 6)}…{f.you === "borrower" ? " (you)" : ""}</td>
+                  <td>{fmt(f.commitment, USDC_DEC, 0)}</td>
+                  <td>{fmt(f.outstanding, USDC_DEC, 0)}</td>
+                  <td>{(f.rateBps / 100).toFixed(2)}%</td>
+                  <td>{new Date(f.availabilityEnd * 1000).toLocaleDateString()}</td>
+                  <td>
+                    <span className={`badge ${f.status === "active" ? "ok" : ""}`}>
+                      <span className="dot" />
+                      {f.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="hint">
+            {facilities.isLoading ? "scanning the chain…" : "no facilities yet — publish the first deal below"}
+          </div>
+        )}
+        <div className="hint">
+          every row is a shareable deal link — copy the URL it opens and send it in Telegram
+        </div>
+      </section>
+      {isConnected && <NewDealCard />}
+      <Timeline />
+    </main>
+  );
+}
+
+type FacilityRow = {
+  id: `0x${string}`;
+  lender: string;
+  borrower: string;
+  commitment: bigint;
+  outstanding: bigint;
+  rateBps: number;
+  availabilityEnd: number;
+  status: "active" | "standing by" | "closed";
+  you: "lender" | "borrower" | null;
+};
+
+function useAllFacilities() {
+  const client = usePublicClient({ chainId: CHAIN_ID });
+  const { address } = useAccount();
+  const you = address?.toLowerCase();
+  return useQuery({
+    queryKey: ["all-facilities", you],
+    enabled: !!client,
+    refetchInterval: 20_000,
+    queryFn: async (): Promise<FacilityRow[]> => {
+      const latest = await client!.getBlockNumber();
+      const regs = await scanEvents(client, "FacilityRegistered", START_BLOCK, latest);
+      const rows = await Promise.all(
+        regs.map(async (e: { args: { facilityId: `0x${string}` } }) => {
+          const id = e.args.facilityId;
+          const [f, outstanding] = await Promise.all([
+            client!.readContract({ abi: escrowAbi, address: ADDR.escrow, functionName: "facilities", args: [id] }),
+            client!.readContract({ abi: escrowAbi, address: ADDR.escrow, functionName: "outstandingOf", args: [id] }),
+          ]);
+          const p = f[2];
+          const open = Date.now() / 1000 <= Number(p.availabilityEnd);
+          return {
+            id,
+            lender: f[1],
+            borrower: p.borrower,
+            commitment: p.commitment,
+            outstanding,
+            rateBps: Number(p.rateBps),
+            availabilityEnd: Number(p.availabilityEnd),
+            status: outstanding > 0n ? "active" : open ? "standing by" : "closed",
+            you:
+              you === f[1].toLowerCase() ? "lender" : you === p.borrower.toLowerCase() ? "borrower" : null,
+          } as FacilityRow;
+        }),
+      );
+      return rows;
+    },
+  });
+}
+
+function DealPage({ facilityId }: { facilityId: `0x${string}` }) {
   const { address, isConnected } = useAccount();
   const { facility } = useFacility(facilityId);
   const lenderAddr = facility?.[1]?.toLowerCase();
@@ -96,6 +215,7 @@ export default function Page() {
       <Header />
 
       <div className="kv" style={{ margin: "0 0 16px" }}>
+        <a href="/">← all deals</a>
         <span className={`badge ${role !== "observer" ? "ok" : ""}`}>
           <span className="dot" />
           {!isConnected
@@ -115,12 +235,7 @@ export default function Page() {
           <DrawPanel facilityId={facilityId} isParty={true} />
         </>
       )}
-      {role === "lender" && (
-        <>
-          <LenderBook facilityId={facilityId} />
-          <NewDealCard />
-        </>
-      )}
+      {role === "lender" && <LenderBook facilityId={facilityId} />}
       <Timeline />
     </main>
   );

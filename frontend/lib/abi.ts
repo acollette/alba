@@ -63,6 +63,15 @@ export const escrowAbi = [
   { type: "function", name: "debtOf", stateMutability: "view", inputs: [{ name: "drawId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "stateOf", stateMutability: "view", inputs: [{ name: "drawId", type: "bytes32" }], outputs: [{ type: "uint8" }] },
   { type: "function", name: "availableToDraw", stateMutability: "view", inputs: [{ name: "facilityId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "outstandingOf", stateMutability: "view", inputs: [{ name: "facilityId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
+  {
+    type: "event", name: "FacilityRegistered",
+    inputs: [
+      { name: "facilityId", type: "bytes32", indexed: true },
+      { name: "lender", type: "address", indexed: true },
+      { name: "collateralRatioBps", type: "uint256", indexed: false },
+    ],
+  },
   {
     type: "function", name: "draw", stateMutability: "nonpayable",
     inputs: [
