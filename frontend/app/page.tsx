@@ -39,6 +39,23 @@ const fmt = (v: bigint | undefined, dec: number, digits = 2) =>
   v === undefined ? "—" : Number(formatUnits(v, dec)).toLocaleString("en-US", { maximumFractionDigits: digits });
 
 const STATE_LABEL = ["—", "active", "settled", "auction", "liquidated"] as const;
+
+// Public RPCs cap eth_getLogs ranges; scan in windows so the book/timeline never
+// silently empty as the chain advances past a single-range limit.
+const LOG_CHUNK = 8_000n;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function scanEvents(client: any, eventName: string, from: bigint, to: bigint, args?: object) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const out: any[] = [];
+  for (let start = from; start <= to; start += LOG_CHUNK + 1n) {
+    const end = start + LOG_CHUNK > to ? to : start + LOG_CHUNK;
+    const batch = await client.getContractEvents({
+      abi: escrowAbi, address: ADDR.escrow, eventName, args, fromBlock: start, toBlock: end,
+    });
+    out.push(...batch);
+  }
+  return out;
+}
 type Role = "lender" | "borrower" | "observer";
 
 function useFacilityId(): `0x${string}` {
@@ -178,14 +195,7 @@ function useDraws(facilityId: `0x${string}`) {
     refetchInterval: 15_000,
     queryFn: async (): Promise<DrawRow[]> => {
       const latest = await client!.getBlockNumber();
-      const events = await client!.getContractEvents({
-        abi: escrowAbi,
-        address: ADDR.escrow,
-        eventName: "Drawn",
-        args: { facilityId },
-        fromBlock: START_BLOCK,
-        toBlock: latest,
-      });
+      const events = await scanEvents(client, "Drawn", START_BLOCK, latest, { facilityId });
       const rows = await Promise.all(
         events.map(async (e) => {
           const id = e.args.drawId as `0x${string}`;
@@ -672,12 +682,11 @@ function Timeline() {
     queryFn: async (): Promise<Row[]> => {
       const rows: Row[] = [];
       const latest = await client!.getBlockNumber();
-      const from = START_BLOCK;
       const [drawn, cured, released, armed] = await Promise.all([
-        client!.getContractEvents({ abi: escrowAbi, address: ADDR.escrow, eventName: "Drawn", fromBlock: from, toBlock: latest }),
-        client!.getContractEvents({ abi: escrowAbi, address: ADDR.escrow, eventName: "DrawCured", fromBlock: from, toBlock: latest }),
-        client!.getContractEvents({ abi: escrowAbi, address: ADDR.escrow, eventName: "CollateralReleased", fromBlock: from, toBlock: latest }),
-        client!.getContractEvents({ abi: escrowAbi, address: ADDR.escrow, eventName: "AuctionArmed", fromBlock: from, toBlock: latest }),
+        scanEvents(client, "Drawn", START_BLOCK, latest),
+        scanEvents(client, "DrawCured", START_BLOCK, latest),
+        scanEvents(client, "CollateralReleased", START_BLOCK, latest),
+        scanEvents(client, "AuctionArmed", START_BLOCK, latest),
       ]);
       for (const l of drawn)
         rows.push({
