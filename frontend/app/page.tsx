@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   useAccount,
@@ -27,12 +27,58 @@ import {
 const fmt = (v: bigint | undefined, dec: number, digits = 2) =>
   v === undefined ? "—" : Number(formatUnits(v, dec)).toLocaleString("en-US", { maximumFractionDigits: digits });
 
+const STATE_LABEL = ["—", "active", "settled", "auction", "liquidated"] as const;
+type Role = "lender" | "borrower";
+
 export default function Page() {
+  const { address } = useAccount();
+  const { facility } = useFacility();
+  const lenderAddr = facility?.[1]?.toLowerCase();
+  const borrowerAddr = facility?.[2]?.borrower?.toLowerCase();
+  const you = address?.toLowerCase();
+  const youAreLender = !!you && you === lenderAddr;
+  const youAreBorrower = !!you && you === borrowerAddr;
+
+  const [role, setRole] = useState<Role>("borrower");
+  const touched = useRef(false);
+  useEffect(() => {
+    if (touched.current) return;
+    if (youAreLender && !youAreBorrower) setRole("lender");
+    if (youAreBorrower) setRole("borrower");
+  }, [youAreLender, youAreBorrower]);
+
   return (
     <main>
       <Header />
-      <FacilityCard />
-      <DrawPanel />
+      <div className="tabs" role="tablist" aria-label="view as">
+        {(["lender", "borrower"] as Role[]).map((r) => (
+          <button
+            key={r}
+            role="tab"
+            aria-selected={role === r}
+            className={role === r ? "active" : ""}
+            onClick={() => {
+              touched.current = true;
+              setRole(r);
+            }}
+          >
+            {r === "lender" ? "Lender" : "Borrower"}
+            {((r === "lender" && youAreLender) || (r === "borrower" && youAreBorrower)) && (
+              <span className="you">YOU</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <FacilityCard role={role} />
+      {role === "borrower" ? (
+        <>
+          <BorrowerObligations />
+          <DrawPanel />
+        </>
+      ) : (
+        <LenderBook />
+      )}
       <Timeline />
     </main>
   );
@@ -91,7 +137,62 @@ function useFacility() {
   return { facility: facility.data, drawn: drawn.data };
 }
 
-function FacilityCard() {
+type DrawRow = {
+  drawId: `0x${string}`;
+  principal: bigint;
+  collateral: bigint;
+  debt: bigint;
+  maturity: number;
+  state: number;
+  healthy: boolean;
+  value: bigint;
+  required: bigint;
+};
+
+function useDraws() {
+  const client = usePublicClient();
+  return useQuery({
+    queryKey: ["draws"],
+    enabled: !!client,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<DrawRow[]> => {
+      const latest = await client!.getBlockNumber();
+      const events = await client!.getContractEvents({
+        abi: escrowAbi,
+        address: ADDR.escrow,
+        eventName: "Drawn",
+        fromBlock: START_BLOCK,
+        toBlock: latest,
+      });
+      const rows = await Promise.all(
+        events.map(async (e) => {
+          const id = e.args.drawId as `0x${string}`;
+          const [d, debt, health] = await Promise.all([
+            client!.readContract({ abi: escrowAbi, address: ADDR.escrow, functionName: "draws", args: [id] }),
+            client!.readContract({ abi: escrowAbi, address: ADDR.escrow, functionName: "debtOf", args: [id] }),
+            client!
+              .readContract({ abi: escrowAbi, address: ADDR.escrow, functionName: "isHealthy", args: [id] })
+              .catch(() => [true, 0n, 0n] as const),
+          ]);
+          return {
+            drawId: id,
+            principal: d[4],
+            collateral: d[3],
+            debt,
+            maturity: Number(d[7]),
+            state: Number(d[8]),
+            healthy: health[0],
+            value: health[1],
+            required: health[2],
+          };
+        }),
+      );
+      return rows.sort((a, b) => b.maturity - a.maturity);
+    },
+  });
+}
+
+function FacilityCard({ role }: { role: Role }) {
   const { facility, drawn } = useFacility();
   const params = facility?.[2];
   const oraclePrice = useReadContract({
@@ -121,19 +222,23 @@ function FacilityCard() {
       </h2>
       <div className="row">
         <div className="tile">
-          <div className="label">Committed</div>
+          <div className="label">{role === "lender" ? "Your commitment" : "Committed"}</div>
           <div className="value num">{fmt(FACILITY_SIZE, USDC_DEC, 0)}</div>
-          <div className="sub">USDC · funds never leave the lender</div>
+          <div className="sub">
+            {role === "lender" ? "USDC · never leaves your wallet until drawn" : "USDC · standing Aqua order"}
+          </div>
         </div>
         <div className="tile accent">
-          <div className="label">Drawn</div>
+          <div className="label">{role === "lender" ? "Deployed" : "Drawn"}</div>
           <div className="value num">{fmt(drawn, USDC_DEC, 0)}</div>
-          <div className="sub">cumulative, on-chain accounting</div>
+          <div className="sub">{role === "lender" ? "earning 4.60% fixed" : "cumulative, on-chain accounting"}</div>
         </div>
         <div className="tile">
-          <div className="label">Available</div>
+          <div className="label">{role === "lender" ? "Undrawn" : "Available"}</div>
           <div className="value num">{fmt(available, USDC_DEC, 0)}</div>
-          <div className="sub">draw on demand, collateral per draw</div>
+          <div className="sub">
+            {role === "lender" ? "committed capacity at rest" : "draw on demand, collateral per draw"}
+          </div>
         </div>
       </div>
       <div className="kv">
@@ -149,7 +254,9 @@ function FacilityCard() {
         <span>
           margining{" "}
           <b className="num">
-            {params ? `${Number(params.collateralRatioBps) / 100}% / ${Number(params.maintenanceRatioBps) / 100}%` : "—"}
+            {params
+              ? `${Number(params.collateralRatioBps) / 100}% / ${Number(params.maintenanceRatioBps) / 100}%`
+              : "—"}
           </b>
         </span>
         <span>
@@ -175,13 +282,108 @@ function FacilityCard() {
         {rate !== undefined && model !== undefined && (
           <span>
             this facility{" "}
-            <b className="num">{(rate - model >= 0 ? "+" : "−") + Math.abs(Math.round((rate - model) * 100)) + "bps"}</b>{" "}
+            <b className="num">
+              {(rate - model >= 0 ? "+" : "−") + Math.abs(Math.round((rate - model) * 100)) + "bps"}
+            </b>{" "}
             vs model
           </span>
         )}
         <a href={`${RATES_API}/`} target="_blank" rel="noreferrer">
           live curve →
         </a>
+      </div>
+    </section>
+  );
+}
+
+function BorrowerObligations() {
+  const draws = useDraws();
+  const active = (draws.data ?? []).filter((d) => d.state === 1);
+  if (!active.length) return null;
+  return (
+    <section className="card">
+      <h2>Your obligations</h2>
+      {active.map((d) => {
+        const ratio = d.required > 0n ? Number((d.value * 1000n) / d.required) / 1000 : 2;
+        const warn = ratio < 1.08;
+        return (
+          <div key={d.drawId} style={{ marginBottom: 14 }}>
+            <div className="kv" style={{ marginTop: 0 }}>
+              <span>
+                draw <b className="mono">{d.drawId.slice(0, 10)}…</b>
+              </span>
+              <span>
+                owed <b className="num">{fmt(d.debt, USDC_DEC, 0)} USDC</b>
+              </span>
+              <span>
+                matures <b>{new Date(d.maturity * 1000).toLocaleString()}</b>
+              </span>
+              <span>
+                collateral <b className="num">{fmt(d.collateral, CBBTC_DEC, 4)} cbBTC</b>
+              </span>
+              <span className={`badge ${d.healthy ? "ok" : "warn"}`}>
+                <span className="dot" />
+                {d.healthy ? "healthy" : "breached"}
+              </span>
+            </div>
+            <div className={`meter ${warn ? "warn" : ""}`} title="collateral value vs maintenance requirement">
+              <div style={{ width: `${Math.min(100, ratio * 66.7).toFixed(1)}%` }} />
+            </div>
+            <div className="hint">
+              collateral covers <b className="num">{(ratio * 115).toFixed(0)}%</b> of debt · maintenance floor 115% ·
+              breach first meets a CURE from your authorized funds, never a fire sale
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function LenderBook() {
+  const draws = useDraws();
+  const rows = draws.data ?? [];
+  const income = rows.filter((d) => d.state === 2);
+  return (
+    <section className="card">
+      <h2>Your book — receivables by draw</h2>
+      {rows.length ? (
+        <table className="list">
+          <thead>
+            <tr>
+              <th>draw</th>
+              <th>principal</th>
+              <th>accrued owed</th>
+              <th>matures</th>
+              <th>collateral</th>
+              <th>status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((d) => (
+              <tr key={d.drawId}>
+                <td className="mono">{d.drawId.slice(0, 10)}…</td>
+                <td>{fmt(d.principal, USDC_DEC, 0)}</td>
+                <td>{d.state === 1 ? fmt(d.debt, USDC_DEC, 0) : "—"}</td>
+                <td>{new Date(d.maturity * 1000).toLocaleDateString()}</td>
+                <td>{fmt(d.collateral, CBBTC_DEC, 4)} cbBTC</td>
+                <td>
+                  <span className={`badge ${d.state === 2 ? "ok" : d.state >= 3 ? "warn" : d.healthy ? "ok" : "warn"}`}>
+                    <span className="dot" />
+                    {d.state === 1 && !d.healthy ? "breached" : STATE_LABEL[d.state]}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="hint">no draws yet — committed capacity is standing by</div>
+      )}
+      <div className="hint">
+        {income.length
+          ? `${income.length} draw${income.length > 1 ? "s" : ""} settled to your wallet — pulled via Aqua, no signature ever requested`
+          : "settlements pull straight to your wallet at maturity — no action, no signature, ever"}
       </div>
     </section>
   );
