@@ -222,3 +222,21 @@ Builder `0x3AE1b534f15966C815FaCA58eCf368a806488232` · Executor
 · cbBTC `0x23391447bE5122149fE370102515226cE799Ab2D` · Oracle
 `0xf38939758b0074CE6e80E1206AD56F4Aef872237` · Hedera trigger v9
 `0x952dE361ae3392A483049517088c51C2618DFD18` (SETTLE scheduled). Frontend on v8.
+
+## LIVE RUNS #7–#8 ✅ — revolving under margin controls + Aave-calibrated terms
+
+- **Run #7 (stack v8, margin controls):** Hedera-scheduled settlement executed;
+  `availableToDraw` refilled to the full 300k commitment on-chain. Stack carries the new
+  margin features: voluntary extra collateral at draw, `topUpCollateral`,
+  `withdrawCollateral` (gated at the initial ratio).
+- **Run #8 (stack v9, CURRENT):** margining calibrated to **Aave v3 Base cbBTC live
+  params — max LTV 73%, liquidation threshold 78%** (13,699/12,821 bps), read via the
+  same Messari-standardized Graph query and exposed as `collateralBenchmark` in
+  /api/rates. Scheduled settlement executed and capacity refilled to 300k again —
+  see Settled event on executor `0x8376C8b6198530D54ec09adB84986FA1E4754812`.
+- Frontend: DeFi-precise terms (max LTV / liq threshold / per-draw liquidation price),
+  readable draw ids with Basescan links, HashScan links on schedule IDs, rate +
+  per-second interest accrual columns in the lender book.
+
+Eight autonomous live runs total: 4 scheduled settlements, 1 sentinel cure,
+3 revolving-refill proofs, across 9 stack iterations. Zero keepers throughout.
