@@ -476,6 +476,16 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
 
 function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
   const draws = useDraws(facilityId);
+  const { facility } = useFacility(facilityId);
+  // live clock so the term bar and countdown tick every second
+  const [now, setNow] = useState(() => Date.now() / 1000);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now() / 1000), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const params = facility?.[2];
+  const maint = params ? Number(params.maintenanceRatioBps) / 10_000 : 1.15;
+  const term = params ? Number(params.termSeconds) : 0;
   const active = (draws.data ?? []).filter((d) => d.state === 1);
   if (!active.length) return null;
   return (
@@ -484,6 +494,12 @@ function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
       {active.map((d) => {
         const ratio = d.required > 0n ? Number((d.value * 1000n) / d.required) / 1000 : 2;
         const warn = ratio < 1.08;
+        const elapsedPct = term > 0 ? Math.min(100, Math.max(0, ((now - (d.maturity - term)) / term) * 100)) : 0;
+        const left = Math.max(0, d.maturity - now);
+        const leftLabel =
+          left >= 86400 ? `${Math.floor(left / 86400)}d ${Math.floor((left % 86400) / 3600)}h`
+          : left >= 3600 ? `${Math.floor(left / 3600)}h ${Math.floor((left % 3600) / 60)}m`
+          : `${Math.floor(left / 60)}m ${Math.floor(left % 60)}s`;
         return (
           <div key={d.drawId} style={{ marginBottom: 14 }}>
             <div className="kv" style={{ marginTop: 0 }}>
@@ -514,14 +530,25 @@ function BorrowerObligations({ facilityId }: { facilityId: `0x${string}` }) {
               <div style={{ width: `${Math.min(100, ratio * 66.7).toFixed(1)}%` }} />
             </div>
             <div className="hint">
-              collateral covers <b className="num">{(ratio * 115).toFixed(0)}%</b> of debt · liquidation price{" "}
+              collateral covers <b className="num">{(ratio * maint * 100).toFixed(0)}%</b> of debt · liquidation price{" "}
               <b className="num">
                 $
-                {((Number(d.debt) / 1e6) * 1.15 / (Number(d.collateral) / 1e8)).toLocaleString("en-US", {
+                {((Number(d.debt) / 1e6) * maint / (Number(d.collateral) / 1e8)).toLocaleString("en-US", {
                   maximumFractionDigits: 0,
                 })}
               </b>{" "}
               · breach first meets a CURE from your authorized funds, never a fire sale
+            </div>
+            <div className="meter" title="term elapsed — the network settles this at maturity">
+              <div style={{ width: `${elapsedPct.toFixed(2)}%`, background: "#2a78d6" }} />
+            </div>
+            <div className="hint">
+              {left > 0 ? (
+                <>term <b className="num">{elapsedPct.toFixed(0)}%</b> elapsed · settles by schedule in{" "}
+                <b className="num">{leftLabel}</b> — no action needed, repayment pulls itself</>
+              ) : (
+                <>matured — awaiting the scheduled settlement pull</>
+              )}
             </div>
             <TopUp drawId={d.drawId} />
           </div>
