@@ -252,7 +252,7 @@ function Header() {
     <div className="topbar">
       <div className="brand">
         AL<em>BA</em>
-        <small>committed credit, settled by schedule</small>
+        <small>credit desk</small>
       </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <span className={`badge ${isConnected ? "ok" : ""}`}>
