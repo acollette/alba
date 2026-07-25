@@ -18,20 +18,20 @@ auditor view. Both demo wallets hold test tokens and gas; testnet-only keys.
 cd frontend && npm run dev                       # :3001 (:3000 is taken on this machine)
 ```
 
-Browser tabs, in story order (v9 stack / v10 trigger):
+Browser tabs, in story order (v10 stack / v11 trigger):
 
 1. App desk overview — http://localhost:3001/ (all facilities, timeline, New-deal card)
 2. Rates dashboard — http://localhost:8787
-3. HashScan trigger — https://hashscan.io/testnet/contract/0x2F1A66A0Cea351B3308d317a96107B4528fc0E37
-4. Axelarscan — https://testnet.axelarscan.io/address/0x2F1A66A0Cea351B3308d317a96107B4528fc0E37
+3. HashScan trigger — https://hashscan.io/testnet/contract/0xF6Ad8045FdD4A07c2B6f36E9b5043d13a86598a7
+4. Axelarscan — https://testnet.axelarscan.io/address/0xF6Ad8045FdD4A07c2B6f36E9b5043d13a86598a7
    (filter flaky for contracts → fall back to the app timeline's direct GMP links)
-5. Basescan escrow — https://sepolia.basescan.org/address/0x8dB282dBBd0fc55f1d231616BdA2dFd0d2Db951A
+5. Basescan escrow — https://sepolia.basescan.org/address/0x27a192BB64B3537BeEE6A458E609D4F89Cfa49ca
 6. Basescan Aqua — https://sepolia.basescan.org/address/0x29C10C31eB844D038A0Dc858997f8ADea1da3270
    ("the pull-rights ledger — holds zero tokens")
 
-Spares: router `0xa99e81a3ff4eD108c3C145dba9137EBD422b6914` · executor
-`0x8376c8b6198530d54EC09aDb84986FA1E4754812` · builder `0x6CB061163D5Bed7801611b1670603979EaB3EA13`
-· oracle `0x37BcB44C38932A87789e97214A927d87490F426E`.
+Spares: router `0x67bC67135A153EEAFDbF352f70EbaA0428d6636b` · executor
+`0x81C35F38B209e7F4A025588cb93be8b51c3897E4` · builder `0x99928dACccf994868bC9ba80de0B47c8DA54151B`
+· oracle `0xeBcC1E49Fb8AeBF95C9653821783e4887ae3aD45`.
 Wallet: both accounts imported, Base Sepolia selected. Terminal visible for Beat 4.
 
 ## The story → the clicks

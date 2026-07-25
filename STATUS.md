@@ -223,6 +223,25 @@ Builder `0x3AE1b534f15966C815FaCA58eCf368a806488232` · Executor
 `0xf38939758b0074CE6e80E1206AD56F4Aef872237` · Hedera trigger v9
 `0x952dE361ae3392A483049517088c51C2618DFD18` (SETTLE scheduled). Frontend on v8.
 
+## LIVE RUN #9 ✅ — stack v10 (uncapped revolver program), pre-demo flight
+
+- **Facility leg without `_stopWhenCovered`** live: escrow is the sole commitment
+  meter, Aqua balance the outer bound; cure/maturity/auction legs keep their caps
+  (borrower/lender protection). Cure leg has its own program body now.
+- Full loop again on fresh infra: Hedera schedule `0xd2f9d7ee…053b` (trigger v11
+  `0xF6Ad8045FdD4A07c2B6f36E9b5043d13a86598a7`, deployed to the nonce-predicted
+  address) → Axelar GMP `0x269899db…` (status executed) → executor settled draw #1:
+  lender +100,000.061263 USDC, `availableToDraw` 200k→300k, collateral released.
+- **Current live stack (v10):** Router `0x67bC67135A153EEAFDbF352f70EbaA0428d6636b` ·
+  Builder `0x99928dACccf994868bC9ba80de0B47c8DA54151B` · Executor
+  `0x81C35F38B209e7F4A025588cb93be8b51c3897E4` · Escrow
+  `0x27a192BB64B3537BeEE6A458E609D4F89Cfa49ca` · USDC
+  `0x9EB96112863ad3286e1f893532c676838D44E393` · cbBTC
+  `0x2E08FE4EF972DD20dCCdA57066d7735Ae8aF55d2` · Oracle
+  `0xeBcC1E49Fb8AeBF95C9653821783e4887ae3aD45` · Hedera trigger v11 funded 15 HBAR.
+  Frontend on v10 (START_BLOCK 44621902). Demo wallets topped up: borrower +2 cbBTC,
+  lender +100k USDC.
+
 ## LIVE RUNS #7–#8 ✅ — revolving under margin controls + Aave-calibrated terms
 
 - **Run #7 (stack v8, margin controls):** Hedera-scheduled settlement executed;
