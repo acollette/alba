@@ -148,3 +148,27 @@ Midnight rates, Graph query, frontend, DealRegistry (thin), position NFT.
   log-DF interpolation, labeled extrapolation), SOFR-style weighted floating composite,
   live dashboard. Day-2 spikes green (Midnight API + tick math; 4 Base subgraphs).
 - Pending: live redeploy (v4) + live sentinel/cure demo; frontend (facility card+timeline).
+
+## LIVE SENTINEL CURE ✅ — the machine watches, and it is merciful
+
+Stack v5 (gas-guarded executor `0x27f0caacf933Fb767b7c71D74e3D1b70c1519630`, escrow
+`0x1cCe09DEa73c584D01B00D23b0DA36040e7C0EBa`, trigger v6
+`0xeb3D736b5Ce06fe875011Bae95218BD1616bC2f8`):
+
+1. cbBTC oracle CRASHED 100k → 80k on Base Sepolia (position: 104k value < 115% × 100k debt).
+2. Sentinel started on Hedera (`sentinelTick` — dispatches CHECK + self-reschedules;
+   recurrence proven on v4: 4 consecutive network-executed ticks).
+3. The CHECK arrived via Axelar and — in ONE transaction, block 44,584,639,
+   tx `0xb6e9d53d2048b725704a6994f73b0d979f5e7e5f26a9f92c3ff02e63757dd284` —
+   noticed the breach, pulled the accrued debt from the borrower's Aqua-authorized
+   cure leg straight to the lender, released the collateral, and reported
+   `HealthChecked(intervened=true)`. **Zero penalty. Zero keepers. Zero humans.**
+
+Backup evidence (v4): manual permissionless cure tx
+`0x8365d548daf619ea5bdde69ca470120d17d428065bee197aeeb48a98955026b6` (same waterfall,
+called directly — `liquidate` is permissionless by design).
+
+**Live-fire lesson (fixed + committed):** try/catch + Axelar relayer gas estimation is a
+footgun — the inner cure can OOG, the catch swallows it, the tx "succeeds" cheaply as
+`intervened=false`, and the simulation therefore never allocates real gas. Fix:
+`MIN_CHECK_GAS` floor makes under-allocation revert retryably. Great Q&A material.
