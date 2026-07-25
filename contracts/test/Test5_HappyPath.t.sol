@@ -173,7 +173,7 @@ contract Test5_HappyPath is Test {
         assertEq(maturity1, uint40(block.timestamp + TERM), "maturity derives from the facility term");
 
         assertEq(usdc.balanceOf(borrower), DRAW1 + DRAW2, "borrower did not receive both draws");
-        assertEq(router.coveredAmount(lender, facilityHash), DRAW1 + DRAW2, "facility accounting wrong");
+        assertEq(escrow.outstandingOf(FACILITY_ID), DRAW1 + DRAW2, "facility accounting wrong");
         assertEq(cbbtc.balanceOf(address(escrow)), COLLAT1 + COLLAT2, "collateral not in escrow");
         assertEq(repayment1, DRAW1 + (DRAW1 * RATE_BPS * TERM) / (10_000 * 365 days), "zero-coupon math");
 
@@ -203,7 +203,8 @@ contract Test5_HappyPath is Test {
         vm.prank(borrower);
         escrow.draw(FACILITY_ID, bytes32(uint256(3)), 150_000e6, 0);
         assertEq(usdc.balanceOf(borrower) - usdcBefore, 150_000e6, "remaining capacity not drawable");
-        assertEq(router.coveredAmount(lender, facilityHash), FACILITY, "facility should now be fully drawn");
+        // draw 1 settled & released (capacity freed), draws 2+3 outstanding: 50k + 150k
+        assertEq(escrow.outstandingOf(FACILITY_ID), DRAW2 + 150_000e6, "outstanding must reflect the freed draw-1 capacity");
     }
 
     /// THE revolver test: cumulative draws exceed the commitment because settled

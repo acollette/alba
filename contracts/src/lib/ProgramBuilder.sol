@@ -43,11 +43,41 @@ abstract contract AlbaProgramBuilder is AlbaInstructionSet {
     }
 
     /// @notice Facility open/draw leg: each draw is a zero-in exact-out partial fill of the
-    /// committed pullToken; `_stopWhenCovered` caps cumulative draws at the facility size.
-    /// `_onlyTaker(taker)` makes the escrow the ONLY doorway to the facility: collateral in
-    /// and cash out are one atomic motion via `CollateralEscrow.draw` (quotes stay open —
-    /// the check skips in static context).
+    /// committed pullToken. `_onlyTaker(taker)` makes the escrow the ONLY doorway to the
+    /// facility: collateral in and cash out are one atomic motion via `CollateralEscrow.draw`
+    /// (quotes stay open — the check skips in static context).
+    ///
+    /// @dev Deliberately NO `_stopWhenCovered` here: that counter is monotonic, while a
+    /// revolver's capacity must refill on `recycle()`. Commitment metering lives in the
+    /// escrow (`outstandingOf + amount <= commitment`), and the live Aqua balance — which
+    /// `push` replenishes — is the hard outer bound on what can ever be pulled.
     function buildFacilityLeg(PullLegTerms memory t, address taker)
+        public
+        pure
+        returns (
+            ISwapVM.Order memory order,
+            bytes memory shipStrategy,
+            address[] memory tokens,
+            uint256[] memory amounts
+        )
+    {
+        Program memory p = ProgramBuilder.init(_albaInstructions());
+        bytes memory bytecode = bytes.concat(
+            p.build(_onlyTaker, OnlyTakerArgsBuilder.build(taker)), p.build(_salt, abi.encodePacked(t.salt))
+        );
+        (order, shipStrategy) = _wrapAquaOrder(t.maker, bytecode, true);
+        (tokens, amounts) = _shipArrays(t);
+    }
+
+    /// @notice Cure leg (per draw, opt-in): zero-in pull rights over the borrower's loan-token
+    /// balance with NO maturity gate — the liquidation path's gentle tier. Gated by
+    /// `_onlyTaker(escrow)` (the escrow only pulls on an oracle-verified breach) and capped
+    /// at the full repayment by `_stopWhenCovered`.
+    ///
+    /// @dev Unlike the facility leg, the cap MUST stay: the borrower is the maker here and
+    /// the escrow operates the pull, so the in-program cap is the borrower's own term sheet —
+    /// cumulative cure pulls can never exceed what is owed, whatever the taker does.
+    function buildCureLeg(PullLegTerms memory t, address taker)
         public
         pure
         returns (
@@ -65,23 +95,6 @@ abstract contract AlbaProgramBuilder is AlbaInstructionSet {
         );
         (order, shipStrategy) = _wrapAquaOrder(t.maker, bytecode, true);
         (tokens, amounts) = _shipArrays(t);
-    }
-
-    /// @notice Cure leg (per draw, opt-in): zero-in pull rights over the borrower's loan-token
-    /// balance with NO maturity gate — the liquidation path's gentle tier. Gated by
-    /// `_onlyTaker(escrow)` (the escrow only pulls on an oracle-verified breach) and capped
-    /// at the full repayment by `_stopWhenCovered`. Identical program shape to the facility leg.
-    function buildCureLeg(PullLegTerms memory t, address taker)
-        public
-        pure
-        returns (
-            ISwapVM.Order memory order,
-            bytes memory shipStrategy,
-            address[] memory tokens,
-            uint256[] memory amounts
-        )
-    {
-        return buildFacilityLeg(t, taker);
     }
 
     /// @notice Maturity leg (per draw): zero-in pull of the repayment from the borrower's

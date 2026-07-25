@@ -101,13 +101,32 @@ contract Test2to4_Opcodes is Test {
         (aIn, aOut,) = router.swap(order, address(cbbtc), address(usdc), amount, _pullData(taker));
     }
 
-    function _shipFacilityLeg() internal returns (ISwapVM.Order memory order, bytes32 orderHash) {
+    /// @dev The capped pull shape now lives on the CURE leg (the facility leg dropped its
+    /// monotonic cap so recycling can revolve); these opcode tests exercise it there.
+    function _shipCappedPullLeg() internal returns (ISwapVM.Order memory order, bytes32 orderHash) {
         bytes memory strategy;
         address[] memory tokens;
         uint256[] memory amounts;
-        (order, strategy, tokens, amounts) = builder.buildFacilityLeg(_facilityTerms(lender, FACILITY_USDC), borrower);
+        (order, strategy, tokens, amounts) = builder.buildCureLeg(_facilityTerms(lender, FACILITY_USDC), borrower);
         vm.prank(lender);
         orderHash = AQUA.ship(address(router), strategy, tokens, amounts);
+    }
+
+    function test_FacilityLeg_NoOdometer_PullsDontAccumulate() public {
+        bytes memory strategy;
+        address[] memory tokens;
+        uint256[] memory amounts;
+        (ISwapVM.Order memory order, bytes memory s2, address[] memory t2, uint256[] memory a2) =
+            builder.buildFacilityLeg(_facilityTerms(lender, FACILITY_USDC), borrower);
+        (strategy, tokens, amounts) = (s2, t2, a2);
+        vm.prank(lender);
+        bytes32 orderHash = AQUA.ship(address(router), strategy, tokens, amounts);
+
+        uint256 before = usdc.balanceOf(borrower);
+        _pullAs(borrower, order, 100_000e6);
+        _pullAs(borrower, order, 100_000e6);
+        assertEq(router.coveredAmount(lender, orderHash), 0, "facility leg must not meter draws in the router");
+        assertEq(usdc.balanceOf(borrower) - before, 200_000e6, "repeat pulls must succeed up to the live Aqua balance");
     }
 
     function _shipMaturityLeg(uint40 maturity) internal returns (ISwapVM.Order memory order, bytes32 orderHash) {
@@ -190,7 +209,7 @@ contract Test2to4_Opcodes is Test {
     // ---------- Test 4: _stopWhenCovered ----------
 
     function test_StopWhenCovered_PartialDrawsSumCorrectly() public {
-        (ISwapVM.Order memory order, bytes32 orderHash) = _shipFacilityLeg();
+        (ISwapVM.Order memory order, bytes32 orderHash) = _shipCappedPullLeg();
 
         (uint256 in1, uint256 out1) = _pullAs(borrower, order, 100_000e6);
         (uint256 in2, uint256 out2) = _pullAs(borrower, order, 50_000e6);
@@ -203,7 +222,7 @@ contract Test2to4_Opcodes is Test {
     }
 
     function test_StopWhenCovered_OverdrawRevertsWithRemaining() public {
-        (ISwapVM.Order memory order,) = _shipFacilityLeg();
+        (ISwapVM.Order memory order,) = _shipCappedPullLeg();
 
         _pullAs(borrower, order, 250_000e6);
 
@@ -213,7 +232,7 @@ contract Test2to4_Opcodes is Test {
     }
 
     function test_StopWhenCovered_LastFillTakesExactRemainder() public {
-        (ISwapVM.Order memory order, bytes32 orderHash) = _shipFacilityLeg();
+        (ISwapVM.Order memory order, bytes32 orderHash) = _shipCappedPullLeg();
 
         _pullAs(borrower, order, 250_000e6);
 
@@ -226,7 +245,7 @@ contract Test2to4_Opcodes is Test {
     }
 
     function test_StopWhenCovered_CoveredOrderReverts() public {
-        (ISwapVM.Order memory order, bytes32 orderHash) = _shipFacilityLeg();
+        (ISwapVM.Order memory order, bytes32 orderHash) = _shipCappedPullLeg();
 
         _pullAs(borrower, order, FACILITY_USDC); // draw everything
 
@@ -236,7 +255,7 @@ contract Test2to4_Opcodes is Test {
     }
 
     function test_StopWhenCovered_StaticQuoteNeverMutatesStorage() public {
-        (ISwapVM.Order memory order, bytes32 orderHash) = _shipFacilityLeg();
+        (ISwapVM.Order memory order, bytes32 orderHash) = _shipCappedPullLeg();
 
         _pullAs(borrower, order, 100_000e6);
         assertEq(router.coveredAmount(lender, orderHash), 100_000e6);
