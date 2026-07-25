@@ -65,6 +65,68 @@ export async function fetchFloatingBand(apiKey) {
 
 export const MIN_BORROW_USD = 1_000_000;
 
+/**
+ * 90d TRAILING composite (SOFR-average style): the NY Fed publishes 30/90/180-day SOFR
+ * averages; this is the DeFi analog. Same standardized schema, TIME-SERIES this time —
+ * each protocol's largest USDC market via Messari daily snapshots, still zero
+ * per-protocol code. Per UTC day: borrow-weighted mean across venues over the liquidity
+ * floor; trailing figure = simple mean of the daily composites. Backward-looking BY
+ * DESIGN — it smooths utilization spikes out of the floating cross-check; the
+ * forward-looking fixed benchmark stays the Midnight curve (see pricing.mjs).
+ */
+export async function fetchTrailingComposite(apiKey, days = 90) {
+  const query = `{
+    markets(where: {inputToken_: {symbol_in: ["USDC", "USDbC"]}},
+            orderBy: totalBorrowBalanceUSD, orderDirection: desc, first: 1) {
+      name
+      dailySnapshots(first: ${days}, orderBy: timestamp, orderDirection: desc) {
+        timestamp
+        totalBorrowBalanceUSD
+        rates { rate side type }
+      }
+    }
+  }`;
+  const perProtocol = await Promise.all(
+    LENDING_SUBGRAPHS.map(async ({ protocol, id }) => {
+      const res = await fetch(`${GRAPH_GATEWAY}/${apiKey}/subgraphs/id/${id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+      const { data, errors } = await res.json();
+      if (errors) return { protocol, error: errors[0].message };
+      const snapshots = (data.markets?.[0]?.dailySnapshots ?? [])
+        .map((s) => ({
+          day: Math.floor(Number(s.timestamp) / 86_400),
+          borrowApr: num(s.rates?.find((r) => r.side === "BORROWER" && r.type === "VARIABLE")?.rate),
+          borrowUSD: Number(s.totalBorrowBalanceUSD),
+        }))
+        .filter((s) => s.borrowApr != null && s.borrowUSD >= MIN_BORROW_USD);
+      return { protocol, snapshots };
+    }),
+  );
+
+  // Bucket by UTC day, borrow-weight across venues, then average the daily composites
+  const byDay = new Map();
+  for (const p of perProtocol) {
+    for (const s of p.snapshots ?? []) {
+      const day = byDay.get(s.day) ?? { rateWeight: 0, weight: 0 };
+      day.rateWeight += s.borrowApr * s.borrowUSD;
+      day.weight += s.borrowUSD;
+      byDay.set(s.day, day);
+    }
+  }
+  const daily = [...byDay.values()].map((d) => d.rateWeight / d.weight);
+  if (!daily.length) return null;
+  return {
+    aprPct: round2(daily.reduce((a, b) => a + b, 0) / daily.length),
+    daysRequested: days,
+    daysWithData: daily.length,
+    method: `simple mean of daily borrow-weighted composites (SOFR-average style), venues ≥ $${(MIN_BORROW_USD / 1e6).toFixed(0)}M/day`,
+    venues: perProtocol.filter((p) => p.snapshots?.length).map((p) => p.protocol),
+  };
+}
+
 /** Margin calibration: Aave v3 Base's live cbBTC risk params via the SAME standardized schema. */
 export async function fetchCollateralBenchmark(apiKey) {
   const res = await fetch(`${GRAPH_GATEWAY}/${apiKey}/subgraphs/id/${LENDING_SUBGRAPHS[0].id}`, {

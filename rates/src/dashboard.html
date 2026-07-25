@@ -97,6 +97,7 @@ async function main() {
   const tiles = [
     { label: "Midnight " + OFFER_DAYS + "d benchmark", value: fmt(bench.aprPct) + "%", sub: bench.method },
     { label: "Floating composite (weighted)", value: fmt(composite.borrowApr) + "%", sub: composite.venues.join(" · ") + " · $" + (composite.totalBorrowUSD / 1e6).toFixed(0) + "M borrow" },
+    ...(r.floating.trailing90d ? [{ label: "90d trailing composite (SOFR-average style)", value: fmt(r.floating.trailing90d.aprPct) + "%", sub: r.floating.trailing90d.daysWithData + "d of Messari daily snapshots · " + r.floating.trailing90d.venues.join(" · ") }] : []),
     { label: "Desk model · 90d · 130/115 margining", value: fmt(suggested.suggestedAprPct) + "%", sub: "benchmark + " + suggested.breakdown.residualRiskBps + "bps residual + " + suggested.breakdown.liquidityPremiumBps + "bps liquidity" },
     { label: "This facility", value: fmt(OFFER_PCT) + "%", sub: spread(OFFER_PCT, suggested.suggestedAprPct) + " vs model" },
   ];

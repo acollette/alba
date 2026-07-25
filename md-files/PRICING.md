@@ -31,7 +31,14 @@ benchmark is not "min and max of whatever answered":
 - **Volume weighting:** the composite is the borrow-balance-weighted mean of the
   included venues — the same discipline that makes SOFR a volume-weighted statistic
   rather than a survey.
-- Role: display context + plausibility bound for the fixed curve. Never a mechanical input.
+- **Trailing average (SOFR-average style):** alongside the spot composite, a **90-day
+  trailing composite** — simple mean of daily borrow-weighted composites, built from the
+  same standardized schema's *daily snapshots* (time-series, still zero per-protocol
+  code). The DeFi analog of the NY Fed's published 30/90/180-day SOFR averages: it
+  smooths utilization spikes out of the cross-check. Tenor-matched to the 90d quote.
+- Role: display context + plausibility bound for the fixed curve. Never a mechanical
+  input — a fixed quote for the NEXT 90 days prices off the forward-looking curve
+  (Midnight), not the past 90 days' average.
 
 ## 3. The facility rate build-up
 
