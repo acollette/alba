@@ -14,11 +14,24 @@ auditor view. Both demo wallets hold test tokens and gas; testnet-only keys.
 ## Pre-flight (10 min before)
 
 ```bash
-GRAPH_API_KEY=... node rates/src/server.mjs     # :8787 — dashboard + desk quotes
+(set -a; source contracts/.env; set +a; node rates/src/server.mjs)  # :8787 — dashboard + desk quotes
 cd frontend && npm run dev                       # :3001 (:3000 is taken on this machine)
 ```
-Browser tabs, in order: app (:3001) · dashboard (:8787) · HashScan trigger account ·
-Axelarscan testnet (filter addr `0xe636…801f`) · Basescan/Blockscout on the escrow.
+
+Browser tabs, in story order (v9 stack / v10 trigger):
+
+1. App desk overview — http://localhost:3001/ (all facilities, timeline, New-deal card)
+2. Rates dashboard — http://localhost:8787
+3. HashScan trigger — https://hashscan.io/testnet/contract/0x2F1A66A0Cea351B3308d317a96107B4528fc0E37
+4. Axelarscan — https://testnet.axelarscan.io/address/0x2F1A66A0Cea351B3308d317a96107B4528fc0E37
+   (filter flaky for contracts → fall back to the app timeline's direct GMP links)
+5. Basescan escrow — https://sepolia.basescan.org/address/0x8dB282dBBd0fc55f1d231616BdA2dFd0d2Db951A
+6. Basescan Aqua — https://sepolia.basescan.org/address/0x29C10C31eB844D038A0Dc858997f8ADea1da3270
+   ("the pull-rights ledger — holds zero tokens")
+
+Spares: router `0xa99e81a3ff4eD108c3C145dba9137EBD422b6914` · executor
+`0x8376c8b6198530d54EC09aDb84986FA1E4754812` · builder `0x6CB061163D5Bed7801611b1670603979EaB3EA13`
+· oracle `0x37BcB44C38932A87789e97214A927d87490F426E`.
 Wallet: both accounts imported, Base Sepolia selected. Terminal visible for Beat 4.
 
 ## The story → the clicks
@@ -31,10 +44,11 @@ protocols, zero per-protocol code — and this is how the deal gets priced."
 against cbBTC inventory. They message a desk. Terms agreed in Telegram. We don't
 pretend to replace that."
 
-**Beat 2 — the deal link (app, LENDER wallet):** Connect the LENDER wallet (the page renders the lender desk by itself) → *New deal*: paste the
-borrower address, 300k / 4.60% / 90d → **Publish** (3 wallet prompts: approve pull
-rights → ship to Aqua → register). Point at the wallet: "funds never left." Copy the
-deal link — "this is the term sheet now; it goes out in Telegram."
+**Beat 2 — the deal link (app, LENDER wallet):** Connect the LENDER wallet on the desk
+OVERVIEW (`/` lists every facility; the New-deal card lives here now) → *New deal*:
+paste the borrower address, 300k / 4.60% / 90d → **Publish** (3 wallet prompts: approve
+pull rights → ship to Aqua → register). Point at the wallet: "funds never left." Copy
+the deal link — "this is the term sheet now; it goes out in Telegram."
 
 **Beat 3 — accept & draw (switch wallet to BORROWER, open the deal link):** the page
 re-renders as the borrower AUTOMATICALLY — no tabs, the wallet IS the role: "the
