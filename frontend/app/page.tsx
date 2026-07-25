@@ -13,7 +13,6 @@ import {
 import { formatUnits, parseUnits, toHex } from "viem";
 import {
   escrowAbi,
-  routerAbi,
   erc20Abi,
   oracleAbi,
   builderAbi,
@@ -276,23 +275,19 @@ function useFacility(facilityId: `0x${string}`) {
     args: [facilityId],
     chainId: CHAIN_ID,
   });
-  const order = facility.data?.[0];
-  const facilityHash = useReadContract({
-    abi: routerAbi,
-    address: ADDR.router,
-    functionName: "hash",
-    args: order ? [order] : undefined,
-    chainId: CHAIN_ID,
-    query: { enabled: !!order },
-  });
-  const lender = facility.data?.[1];
-  const lifetime = useReadContract({
-    abi: routerAbi,
-    address: ADDR.router,
-    functionName: "coveredAmount",
-    args: lender && facilityHash.data ? [lender, facilityHash.data] : undefined,
-    chainId: CHAIN_ID,
-    query: { enabled: !!lender && !!facilityHash.data, refetchInterval: 8000 },
+  // Lifetime gross volume = sum of Drawn events. (Not the router's coveredAmount:
+  // the facility leg no longer carries a _stopWhenCovered odometer — it would fight
+  // the revolving — so the event log is the source of truth for turnover.)
+  const client = usePublicClient({ chainId: CHAIN_ID });
+  const lifetime = useQuery({
+    queryKey: ["lifetime", facilityId],
+    enabled: !!client,
+    refetchInterval: 15_000,
+    queryFn: async (): Promise<bigint> => {
+      const latest = await client!.getBlockNumber();
+      const events = await scanEvents(client, "Drawn", START_BLOCK, latest, { facilityId });
+      return events.reduce((sum: bigint, e: { args: { amount: bigint } }) => sum + e.args.amount, 0n);
+    },
   });
   const available = useReadContract({
     abi: escrowAbi,
