@@ -26,7 +26,6 @@ import {
   BUILDER,
   CHAIN_ID,
   DEFAULT_FACILITY_ID,
-  FACILITY_SIZE,
   START_BLOCK,
   RATES_API,
   HEDERA_MIRROR,
@@ -164,7 +163,7 @@ function useFacility(facilityId: `0x${string}`) {
     query: { enabled: !!order },
   });
   const lender = facility.data?.[1];
-  const drawn = useReadContract({
+  const lifetime = useReadContract({
     abi: routerAbi,
     address: ADDR.router,
     functionName: "coveredAmount",
@@ -172,7 +171,15 @@ function useFacility(facilityId: `0x${string}`) {
     chainId: CHAIN_ID,
     query: { enabled: !!lender && !!facilityHash.data, refetchInterval: 8000 },
   });
-  return { facility: facility.data, drawn: drawn.data };
+  const available = useReadContract({
+    abi: escrowAbi,
+    address: ADDR.escrow,
+    functionName: "availableToDraw",
+    args: [facilityId],
+    chainId: CHAIN_ID,
+    query: { refetchInterval: 8000 },
+  });
+  return { facility: facility.data, lifetime: lifetime.data, available: available.data };
 }
 
 type DrawRow = {
@@ -225,7 +232,7 @@ function useDraws(facilityId: `0x${string}`) {
 }
 
 function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: Role }) {
-  const { facility, drawn } = useFacility(facilityId);
+  const { facility, lifetime, available } = useFacility(facilityId);
   const params = facility?.[2];
   const oraclePrice = useReadContract({
     abi: oracleAbi,
@@ -242,7 +249,9 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
     retry: 1,
   });
 
-  const available = drawn !== undefined ? FACILITY_SIZE - drawn : undefined;
+  const commitment = params?.commitment;
+  const outstanding =
+    commitment !== undefined && available !== undefined ? commitment - available : undefined;
   const rate = params ? Number(params.rateBps) / 100 : undefined;
   const bench = rates.data?.fixed?.benchmark90d?.aprPct as number | undefined;
   const model = rates.data?.suggested90d?.suggestedAprPct as number | undefined;
@@ -256,27 +265,27 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
       <div className="row">
         <div className="tile">
           <div className="label">{role === "lender" ? "Your commitment" : "Committed"}</div>
-          <div className="value num">{fmt(FACILITY_SIZE, USDC_DEC, 0)}</div>
+          <div className="value num">{fmt(commitment, USDC_DEC, 0)}</div>
           <div className="sub">
             {role === "lender" ? "USDC · never leaves your wallet until drawn" : "USDC · standing Aqua order"}
           </div>
         </div>
         <div className="tile accent">
-          <div className="label">{role === "lender" ? "Deployed" : "Drawn"}</div>
-          <div className="value num">{fmt(drawn, USDC_DEC, 0)}</div>
+          <div className="label">Outstanding</div>
+          <div className="value num">{fmt(outstanding, USDC_DEC, 0)}</div>
           <div className="sub">
             {role === "lender"
               ? rate !== undefined
-                ? `earning ${rate.toFixed(2)}% fixed`
+                ? `earning ${rate.toFixed(2)}% fixed · ${fmt(lifetime, USDC_DEC, 0)} lifetime volume`
                 : "earning fixed"
-              : "cumulative, on-chain accounting"}
+              : `repaying replenishes capacity · ${fmt(lifetime, USDC_DEC, 0)} lifetime volume`}
           </div>
         </div>
         <div className="tile">
           <div className="label">{role === "lender" ? "Undrawn" : "Available"}</div>
           <div className="value num">{fmt(available, USDC_DEC, 0)}</div>
           <div className="sub">
-            {role === "lender" ? "committed capacity at rest" : "draw on demand, collateral per draw"}
+            {role === "lender" ? "committed capacity at rest" : "revolving — draw, repay, draw again"}
           </div>
         </div>
       </div>
@@ -296,6 +305,12 @@ function FacilityCard({ facilityId, role }: { facilityId: `0x${string}`; role: R
             {params
               ? `${Number(params.collateralRatioBps) / 100}% / ${Number(params.maintenanceRatioBps) / 100}%`
               : "—"}
+          </b>
+        </span>
+        <span>
+          availability until{" "}
+          <b>
+            {params?.availabilityEnd ? new Date(Number(params.availabilityEnd) * 1000).toLocaleDateString() : "—"}
           </b>
         </span>
         <span>
@@ -438,6 +453,7 @@ function NewDealCard() {
   const [size, setSize] = useState("300000");
   const [ratePct, setRatePct] = useState("4.60");
   const [termDays, setTermDays] = useState("90");
+  const [availDays, setAvailDays] = useState("364");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [dealLink, setDealLink] = useState("");
@@ -450,6 +466,7 @@ function NewDealCard() {
     setBusy(true);
     try {
       const sizeUnits = parseUnits(size, USDC_DEC);
+      const grossCeiling = sizeUnits * 4n; // Aqua safety rail; the escrow meters revolving capacity
       const rateBps = BigInt(Math.round(Number(ratePct) * 100));
       const termSeconds = BigInt(Math.round(Number(termDays) * 86400));
       const salt = BigInt(Date.now());
@@ -459,9 +476,9 @@ function NewDealCard() {
       const allowance = await client!.readContract({
         abi: erc20Abi, address: ADDR.usdc, functionName: "allowance", args: [address!, AQUA],
       });
-      if (allowance < sizeUnits) {
+      if (allowance < grossCeiling) {
         await writeContractAsync({
-          abi: erc20Abi, address: ADDR.usdc, functionName: "approve", args: [AQUA, sizeUnits * 2n], chainId: CHAIN_ID,
+          abi: erc20Abi, address: ADDR.usdc, functionName: "approve", args: [AQUA, grossCeiling], chainId: CHAIN_ID,
         });
       }
 
@@ -471,7 +488,7 @@ function NewDealCard() {
         address: BUILDER,
         functionName: "buildFacilityLeg",
         args: [
-          { maker: address!, counterToken: ADDR.cbbtc, pullToken: ADDR.usdc, amount: sizeUnits, salt },
+          { maker: address!, counterToken: ADDR.cbbtc, pullToken: ADDR.usdc, amount: grossCeiling, salt },
           ADDR.escrow,
         ],
       });
@@ -497,6 +514,8 @@ function NewDealCard() {
             termSeconds: Number(termSeconds),
             auctionDuration: 3600,
             auctionDecay: 999940000000000000n,
+            commitment: sizeUnits,
+            availabilityEnd: Math.floor(Date.now() / 1000) + Math.round(Number(availDays) * 86400),
           },
         ],
         chainId: CHAIN_ID,
@@ -539,7 +558,14 @@ function NewDealCard() {
           onChange={(e) => setTermDays(e.target.value.replace(/[^0-9.]/g, ""))}
           aria-label="term days"
         />
-        <span style={{ color: "var(--ink-2)" }}>day draws · 130/115 margining</span>
+        <span style={{ color: "var(--ink-2)" }}>day draws ·</span>
+        <input
+          style={{ width: 70 }}
+          value={availDays}
+          onChange={(e) => setAvailDays(e.target.value.replace(/[^0-9.]/g, ""))}
+          aria-label="availability days"
+        />
+        <span style={{ color: "var(--ink-2)" }}>day availability · 130/115 margining</span>
         <button onClick={publish} disabled={!isConnected || busy}>
           Publish
         </button>

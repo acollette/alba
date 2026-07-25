@@ -84,7 +84,9 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         require(msg.sender == address(this), OnlyOrderMaker(msg.sender, address(this)));
         Settlement storage s = settlements[drawId];
         amount = escrow.maturityOutstanding(drawId);
-        ROUTER.swap(s.order, s.counterToken, s.pullToken, amount, _takerData(escrow.lenderOf(drawId)));
+        // Pull lands at the ESCROW, which recycles it into the lender's facility strategy:
+        // the lender is paid AND the revolving capacity refills, in one motion.
+        ROUTER.swap(s.order, s.counterToken, s.pullToken, amount, _takerData(address(escrow)));
     }
 
     /// @notice External self-call target so the sentinel check can be try/caught.
@@ -138,6 +140,7 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         }
 
         try this.attemptSettle(drawId) returns (uint256 amount) {
+            escrow.recycle(drawId, amount);
             escrow.release(drawId);
             emit Settled(drawId, amount, escrow.lenderOf(drawId));
         } catch {
@@ -146,7 +149,7 @@ contract AxelarSettlementExecutor is AxelarExecutable {
         }
     }
 
-    function _takerData(address lender) private view returns (bytes memory) {
+    function _takerData(address to) private view returns (bytes memory) {
         return TakerTraitsLib.build(
             TakerTraitsLib.Args({
                 taker: address(this),
@@ -156,7 +159,7 @@ contract AxelarSettlementExecutor is AxelarExecutable {
                 isFirstTransferFromTaker: false,
                 useTransferFromAndAquaPush: false,
                 threshold: "",
-                to: lender, // repayment lands straight with the lender
+                to: to, // escrow first — it recycles into the facility strategy, paying the lender
                 deadline: 0,
                 hasPreTransferInCallback: false,
                 hasPreTransferOutCallback: false,

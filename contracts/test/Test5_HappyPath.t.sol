@@ -76,7 +76,7 @@ contract Test5_HappyPath is Test {
                 maker: lender,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
-                amount: FACILITY,
+                amount: FACILITY * 4, // gross Aqua ceiling; the escrow meters the revolving capacity
                 salt: 1
             }),
             address(escrow)
@@ -97,7 +97,9 @@ contract Test5_HappyPath is Test {
                 rateBps: RATE_BPS,
                 termSeconds: uint40(TERM),
                 auctionDuration: 3600,
-                auctionDecay: 0.99994e18
+                auctionDecay: 0.99994e18,
+                commitment: FACILITY,
+                availabilityEnd: uint40(block.timestamp + 364 days)
             })
         );
 
@@ -204,6 +206,55 @@ contract Test5_HappyPath is Test {
         assertEq(router.coveredAmount(lender, facilityHash), FACILITY, "facility should now be fully drawn");
     }
 
+    /// THE revolver test: cumulative draws exceed the commitment because settled
+    /// principal replenishes capacity — via Aqua push, while paying the lender.
+    function test_Revolving_CapacityReplenishes() public {
+        usdc.mint(borrower, 5_000e6); // interest headroom
+        (ISwapVM.Order memory m1, uint40 maturity1, uint256 repayment1) = _draw(1, DRAW1, COLLAT1);
+        assertEq(escrow.availableToDraw(FACILITY_ID), FACILITY - DRAW1);
+
+        // Settle draw 1 the executor way: pull to the ESCROW, recycle into the facility
+        // strategy (lender paid + capacity refilled), release collateral
+        vm.warp(maturity1);
+        uint256 lenderBefore = usdc.balanceOf(lender);
+        vm.prank(executor);
+        router.swap(m1, address(cbbtc), address(usdc), repayment1, _pullData(executor, address(escrow)));
+        vm.prank(executor);
+        escrow.recycle(bytes32(uint256(1)), repayment1);
+        vm.prank(executor);
+        escrow.release(bytes32(uint256(1)));
+
+        assertEq(usdc.balanceOf(lender) - lenderBefore, repayment1, "push must pay the lender in real tokens");
+        assertEq(escrow.availableToDraw(FACILITY_ID), FACILITY, "capacity fully replenished");
+
+        // Cumulative would now be 100k + 300k = 400k > the 300k commitment: only a
+        // genuine revolver can do this
+        oracle.setAnswer(100_000e8); // fresh mark post-warp
+        vm.prank(borrower);
+        escrow.draw(FACILITY_ID, bytes32(uint256(2)), FACILITY);
+        assertEq(escrow.availableToDraw(FACILITY_ID), 0, "fully drawn again after replenishment");
+    }
+
+    function test_Draw_CommitmentGate() public {
+        vm.prank(borrower);
+        escrow.draw(FACILITY_ID, bytes32(uint256(1)), FACILITY);
+        vm.expectRevert(
+            abi.encodeWithSelector(CollateralEscrow.FacilityCommitmentExceeded.selector, FACILITY, 1e6, FACILITY)
+        );
+        vm.prank(borrower);
+        escrow.draw(FACILITY_ID, bytes32(uint256(2)), 1e6);
+    }
+
+    function test_Draw_AvailabilityExpires() public {
+        vm.warp(block.timestamp + 365 days);
+        oracle.setAnswer(100_000e8);
+        assertEq(escrow.availableToDraw(FACILITY_ID), 0, "no capacity past the availability window");
+        (,, CollateralEscrow.FacilityParams memory p,,,,) = escrow.facilities(FACILITY_ID);
+        vm.expectRevert(abi.encodeWithSelector(CollateralEscrow.AvailabilityExpired.selector, p.availabilityEnd));
+        vm.prank(borrower);
+        escrow.draw(FACILITY_ID, bytes32(uint256(1)), 1_000e6);
+    }
+
     function test_Release_OnlyExecutor() public {
         vm.prank(borrower);
         escrow.draw(FACILITY_ID, bytes32(uint256(9)), 10_000e6);
@@ -240,7 +291,9 @@ contract Test5_HappyPath is Test {
                 rateBps: RATE_BPS,
                 termSeconds: uint40(TERM),
                 auctionDuration: 3600,
-                auctionDecay: 0.99994e18
+                auctionDecay: 0.99994e18,
+                commitment: FACILITY,
+                availabilityEnd: uint40(block.timestamp + 364 days)
             })
         );
     }

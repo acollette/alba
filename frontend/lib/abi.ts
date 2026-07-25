@@ -25,6 +25,8 @@ export const escrowAbi = [
           { name: "termSeconds", type: "uint40" },
           { name: "auctionDuration", type: "uint16" },
           { name: "auctionDecay", type: "uint64" },
+          { name: "commitment", type: "uint256" },
+          { name: "availabilityEnd", type: "uint40" },
         ],
       },
       { name: "loanDecimals", type: "uint8" },
@@ -60,6 +62,7 @@ export const escrowAbi = [
   },
   { type: "function", name: "debtOf", stateMutability: "view", inputs: [{ name: "drawId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "stateOf", stateMutability: "view", inputs: [{ name: "drawId", type: "bytes32" }], outputs: [{ type: "uint8" }] },
+  { type: "function", name: "availableToDraw", stateMutability: "view", inputs: [{ name: "facilityId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
   {
     type: "function", name: "draw", stateMutability: "nonpayable",
     inputs: [
@@ -209,6 +212,8 @@ export const registerFacilityAbi = [
           { name: "termSeconds", type: "uint40" },
           { name: "auctionDuration", type: "uint16" },
           { name: "auctionDecay", type: "uint64" },
+          { name: "commitment", type: "uint256" },
+          { name: "availabilityEnd", type: "uint40" },
         ],
       },
     ],

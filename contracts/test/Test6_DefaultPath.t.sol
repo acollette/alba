@@ -77,7 +77,7 @@ contract Test6_DefaultPath is Test {
                 maker: lender,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
-                amount: FACILITY,
+                amount: FACILITY * 4, // gross Aqua ceiling; the escrow meters the revolving capacity
                 salt: 1
             }),
             address(escrow)
@@ -96,7 +96,9 @@ contract Test6_DefaultPath is Test {
                 rateBps: RATE_BPS,
                 termSeconds: uint40(TERM),
                 auctionDuration: DURATION,
-                auctionDecay: DECAY
+                auctionDecay: DECAY,
+                commitment: FACILITY,
+                availabilityEnd: uint40(block.timestamp + 364 days)
             })
         );
         vm.stopPrank();

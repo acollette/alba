@@ -87,7 +87,7 @@ contract Test7_AxelarWiring is Test {
                 maker: lender,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
-                amount: FACILITY,
+                amount: FACILITY * 4, // gross Aqua ceiling; the escrow meters the revolving capacity
                 salt: 1
             }),
             address(escrow)
@@ -106,7 +106,9 @@ contract Test7_AxelarWiring is Test {
                 rateBps: RATE_BPS,
                 termSeconds: uint40(TERM),
                 auctionDuration: 3600,
-                auctionDecay: 0.99994e18
+                auctionDecay: 0.99994e18,
+                commitment: FACILITY,
+                availabilityEnd: uint40(block.timestamp + 364 days)
             })
         );
         vm.stopPrank();

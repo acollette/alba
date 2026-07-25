@@ -7,6 +7,8 @@ import {SafeERC20, IERC20} from "@1inch/solidity-utils/contracts/libraries/SafeE
 import {ISwapVM} from "swap-vm/src/interfaces/ISwapVM.sol";
 import {TakerTraitsLib} from "swap-vm/src/libs/TakerTraits.sol";
 
+import {IAqua} from "@1inch/aqua/src/interfaces/IAqua.sol";
+
 import {TermRouter} from "./TermRouter.sol";
 import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
 import {AlbaProgramBuilder} from "./lib/ProgramBuilder.sol";
@@ -45,6 +47,8 @@ contract CollateralEscrow {
     error OnlyFacilityLender(address caller, address lender);
     error OnlyFacilityBorrower(address caller, address borrower);
     error SelfFacingFacility(address lenderAndBorrower);
+    error FacilityCommitmentExceeded(uint256 outstanding, uint256 requested, uint256 commitment);
+    error AvailabilityExpired(uint40 availabilityEnd);
     error DrawAlreadyExists(bytes32 drawId);
     error DrawNotLocked(bytes32 drawId);
     error DrawHealthy(bytes32 drawId, uint256 collateralValue, uint256 requiredValue);
@@ -87,6 +91,8 @@ contract CollateralEscrow {
         uint40 termSeconds; // per-draw tenor
         uint16 auctionDuration; // liquidation auction lifetime (expiry = price floor)
         uint64 auctionDecay; // per-second decay ×1e18
+        uint256 commitment; // the revolver's capacity: outstanding principal may never exceed this
+        uint40 availabilityEnd; // the commitment's own term — no new draws after this date
     }
 
     struct Facility {
@@ -113,6 +119,7 @@ contract CollateralEscrow {
     );
     event CollateralLocked(bytes32 indexed drawId, address indexed borrower, address token, uint256 amount);
     event CollateralReleased(bytes32 indexed drawId, address indexed borrower, uint256 amount);
+    event RepaymentRecycled(bytes32 indexed drawId, bytes32 indexed facilityId, uint256 amount, bool intoStrategy);
     event DrawCured(bytes32 indexed drawId, uint256 amountPulled, bool fullClose);
     event AuctionArmed(bytes32 indexed drawId, bytes32 orderHash, uint256 target);
     event AuctionSwept(
@@ -135,6 +142,9 @@ contract CollateralEscrow {
     address public immutable FEE_SINK;
 
     mapping(bytes32 facilityId => Facility) public facilities;
+    /// @dev The revolving meter: principal currently outstanding per facility. Draws add;
+    /// a draw CLOSING (settled, fully cured, or liquidation swept) frees its principal.
+    mapping(bytes32 facilityId => uint256) public outstandingOf;
     mapping(bytes32 drawId => Draw) public draws;
     mapping(bytes32 drawId => Auction) public auctions;
     /// @dev ERC-1271 authorization set: order hashes of currently armed auctions
@@ -213,6 +223,12 @@ contract CollateralEscrow {
             OnlyFacilityBorrower(msg.sender, f.params.borrower)
         );
         require(draws[drawId].state == DrawState.NONE, DrawAlreadyExists(drawId));
+        require(block.timestamp <= f.params.availabilityEnd, AvailabilityExpired(f.params.availabilityEnd));
+        require(
+            outstandingOf[facilityId] + amount <= f.params.commitment,
+            FacilityCommitmentExceeded(outstandingOf[facilityId], amount, f.params.commitment)
+        );
+        outstandingOf[facilityId] += amount;
 
         collateral = collateralForDraw(facilityId, amount);
         draws[drawId] = Draw({
@@ -273,6 +289,13 @@ contract CollateralEscrow {
         value = collateralValueInLoan(drawId);
         required = (debtOf(drawId) * f.params.maintenanceRatioBps) / 10_000;
         healthy = value >= required;
+    }
+
+    /// @notice Undrawn revolving capacity: commitment minus outstanding principal.
+    function availableToDraw(bytes32 facilityId) external view returns (uint256) {
+        Facility storage f = facilities[facilityId];
+        if (!f.exists || block.timestamp > f.params.availabilityEnd) return 0;
+        return f.params.commitment - outstandingOf[facilityId];
     }
 
     function stateOf(bytes32 drawId) external view returns (DrawState) {
@@ -336,9 +359,12 @@ contract CollateralEscrow {
             } catch {} // not shipped / no allowance — fall through to the auction tier
         }
 
+        if (pulled > 0) _recycleToFacility(d.facilityId, drawId, pulled);
+
         if (pulled == debt) {
             // Tier 1 — full cure: early settlement at accrued value, collateral home, no penalty
             d.state = DrawState.RELEASED;
+            outstandingOf[d.facilityId] -= d.principal; // capacity frees — the revolver revolves
             d.token.safeTransfer(d.borrower, d.amount);
             emit DrawCured(drawId, pulled, true);
             emit CollateralReleased(drawId, d.borrower, d.amount);
@@ -364,9 +390,9 @@ contract CollateralEscrow {
         Draw storage d = draws[drawId];
         Facility storage f = facilities[d.facilityId];
         (ISwapVM.Order memory order,,,) = cureOrder(drawId);
-        // Cure proceeds go straight to the lender: debt paydown, not escrow custody
+        // Cure proceeds land here first, then recycle into the lender's facility strategy
         ROUTER.swap(
-            order, address(f.params.collateralToken), address(f.params.loanToken), amount, _pullTakerData(f.lender)
+            order, address(f.params.collateralToken), address(f.params.loanToken), amount, _pullTakerData(address(this))
         );
     }
 
@@ -377,8 +403,30 @@ contract CollateralEscrow {
         Draw storage d = draws[drawId];
         require(d.state == DrawState.LOCKED, DrawNotLocked(drawId));
         d.state = DrawState.RELEASED;
+        outstandingOf[d.facilityId] -= d.principal; // the revolver revolves: capacity frees
         d.token.safeTransfer(d.borrower, d.amount);
         emit CollateralReleased(drawId, d.borrower, d.amount);
+    }
+
+    /// @notice Route a repayment the executor pulled to this escrow back INTO the lender's
+    /// facility strategy: Aqua `push` hands the lender the real USDC in the same breath as
+    /// it refills the strategy's pullable balance — replenishment as a side effect of
+    /// getting paid. Falls back to a direct transfer if the strategy is gone (docked).
+    function recycle(bytes32 drawId, uint256 amount) external onlyExecutor {
+        _recycleToFacility(draws[drawId].facilityId, drawId, amount);
+    }
+
+    function _recycleToFacility(bytes32 facilityId, bytes32 drawId, uint256 amount) private {
+        Facility storage f = facilities[facilityId];
+        IAqua aqua = ROUTER.AQUA();
+        f.params.loanToken.forceApprove(address(aqua), amount);
+        try aqua.push(f.lender, address(ROUTER), ROUTER.hash(f.order), address(f.params.loanToken), amount) {
+            emit RepaymentRecycled(drawId, facilityId, amount, true);
+        } catch {
+            f.params.loanToken.forceApprove(address(aqua), 0);
+            f.params.loanToken.safeTransfer(f.lender, amount);
+            emit RepaymentRecycled(drawId, facilityId, amount, false);
+        }
     }
 
     /// @notice Maturity-default path: executor arms the auction after a confirmed failed pull.
@@ -435,6 +483,7 @@ contract CollateralEscrow {
         require(raised >= target, AuctionNotCovered(drawId, raised, target));
 
         d.state = DrawState.LIQUIDATED;
+        outstandingOf[d.facilityId] -= d.principal; // resolved: capacity frees (lender may dock)
 
         // Sold = allowance consumed by router pulls; close every path to the collateral
         uint256 sold = d.amount - d.token.allowance(address(this), address(ROUTER));

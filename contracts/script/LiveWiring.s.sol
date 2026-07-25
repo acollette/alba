@@ -67,7 +67,7 @@ contract LiveWiring is Script {
                 maker: me,
                 counterToken: address(cbbtc),
                 pullToken: address(usdc),
-                amount: FACILITY,
+                amount: FACILITY * 4, // gross Aqua ceiling; the escrow meters the revolving capacity
                 salt: 1
             }),
             address(escrow)
@@ -86,7 +86,9 @@ contract LiveWiring is Script {
                 rateBps: RATE_BPS,
                 termSeconds: 420, // short live tenor so the settlement demo fits a coffee break
                 auctionDuration: 3600,
-                auctionDecay: 0.99994e18
+                auctionDecay: 0.99994e18,
+                commitment: FACILITY,
+                availabilityEnd: uint40(block.timestamp + 364 days)
             })
         );
 
@@ -106,7 +108,8 @@ contract LiveWiring is Script {
 
         (,,,,,,, uint40 maturity,) = escrow.draws(bytes32(uint256(1)));
         uint256 repayment = escrow.repaymentOf(bytes32(uint256(1)));
-        maturity; repayment; // logged below
+        maturity;
+        repayment; // logged below
         (
             ISwapVM.Order memory maturityOrder,
             bytes memory mStrategy,
