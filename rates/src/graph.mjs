@@ -30,28 +30,37 @@ export async function fetchFloatingBand(apiKey) {
     }),
   );
 
-  // SOFR-style discipline: the headline composite is VOLUME-WEIGHTED and venues below
-  // a liquidity floor are excluded from it (they stay visible in `protocols`). A $24k
-  // book must not move a benchmark anchored by $450M of borrow.
+  // SOFR-style discipline, twice over. (1) Liquidity floor: venues below $1M borrow are
+  // excluded from the headline (still visible in `protocols`) — a $24k book must not move
+  // a benchmark anchored by ~$450M. (2) The composite is the borrow-weighted MEDIAN —
+  // the same statistic SOFR actually is — so one small venue in a utilization spike
+  // (rates go vertical above the kink) cannot drag the benchmark. Venues printing >3×
+  // the median are flagged `stressed`: still in the table and the median calc, but kept
+  // out of the DISPLAY band so an outlier doesn't wreck the chart scale.
   const rated = perProtocol.filter((p) => p.borrowApr != null);
   const included = rated.filter((p) => p.totalBorrowUSD >= MIN_BORROW_USD);
   const weight = included.reduce((s, p) => s + p.totalBorrowUSD, 0);
-  const composite = weight
-    ? round2(included.reduce((s, p) => s + p.borrowApr * p.totalBorrowUSD, 0) / weight)
-    : null;
+  const composite = included.length ? round2(weightedMedian(included)) : null;
+  const isStressed = (p) => composite != null && p.borrowApr > STRESS_MULTIPLE * composite;
+  const calm = included.filter((p) => !isStressed(p));
 
   return {
-    protocols: rated.map((p) => ({ ...p, includedInComposite: p.totalBorrowUSD >= MIN_BORROW_USD })),
+    protocols: rated.map((p) => ({
+      ...p,
+      includedInComposite: p.totalBorrowUSD >= MIN_BORROW_USD,
+      stressed: isStressed(p),
+    })),
     composite: {
       borrowApr: composite,
-      method: `borrow-balance-weighted mean, venues ≥ $${(MIN_BORROW_USD / 1e6).toFixed(0)}M borrow`,
+      method: `borrow-balance-weighted median (the SOFR statistic), venues ≥ $${(MIN_BORROW_USD / 1e6).toFixed(0)}M borrow`,
       venues: included.map((p) => p.protocol),
       totalBorrowUSD: Math.round(weight),
     },
-    band: included.length
+    band: calm.length
       ? {
-          borrowMin: Math.min(...included.map((p) => p.borrowApr)),
-          borrowMax: Math.max(...included.map((p) => p.borrowApr)),
+          borrowMin: Math.min(...calm.map((p) => p.borrowApr)),
+          borrowMax: Math.max(...calm.map((p) => p.borrowApr)),
+          excludesStressed: calm.length < included.length,
         }
       : null,
     rawRange: rated.length
@@ -64,6 +73,20 @@ export async function fetchFloatingBand(apiKey) {
 }
 
 export const MIN_BORROW_USD = 1_000_000;
+export const STRESS_MULTIPLE = 3; // venue rate > 3× the weighted median = utilization spike
+
+/** Borrow-weighted median of {borrowApr, totalBorrowUSD} — the rate at which half the
+ * borrowed dollars fund cheaper and half fund dearer. */
+function weightedMedian(venues) {
+  const sorted = [...venues].sort((a, b) => a.borrowApr - b.borrowApr);
+  const half = sorted.reduce((s, v) => s + v.totalBorrowUSD, 0) / 2;
+  let cum = 0;
+  for (const v of sorted) {
+    cum += v.totalBorrowUSD;
+    if (cum >= half) return v.borrowApr;
+  }
+  return sorted[sorted.length - 1].borrowApr;
+}
 
 /**
  * 90d TRAILING composite (SOFR-average style): the NY Fed publishes 30/90/180-day SOFR
@@ -106,23 +129,23 @@ export async function fetchTrailingComposite(apiKey, days = 90) {
     }),
   );
 
-  // Bucket by UTC day, borrow-weight across venues, then average the daily composites
+  // Bucket by UTC day, take each day's borrow-weighted MEDIAN across venues (same
+  // robust statistic as the spot composite), then average the daily figures
   const byDay = new Map();
   for (const p of perProtocol) {
     for (const s of p.snapshots ?? []) {
-      const day = byDay.get(s.day) ?? { rateWeight: 0, weight: 0 };
-      day.rateWeight += s.borrowApr * s.borrowUSD;
-      day.weight += s.borrowUSD;
+      const day = byDay.get(s.day) ?? [];
+      day.push({ borrowApr: s.borrowApr, totalBorrowUSD: s.borrowUSD });
       byDay.set(s.day, day);
     }
   }
-  const daily = [...byDay.values()].map((d) => d.rateWeight / d.weight);
+  const daily = [...byDay.values()].map(weightedMedian);
   if (!daily.length) return null;
   return {
     aprPct: round2(daily.reduce((a, b) => a + b, 0) / daily.length),
     daysRequested: days,
     daysWithData: daily.length,
-    method: `simple mean of daily borrow-weighted composites (SOFR-average style), venues ≥ $${(MIN_BORROW_USD / 1e6).toFixed(0)}M/day`,
+    method: `simple mean of daily borrow-weighted medians (SOFR-average style), venues ≥ $${(MIN_BORROW_USD / 1e6).toFixed(0)}M/day`,
     venues: perProtocol.filter((p) => p.snapshots?.length).map((p) => p.protocol),
   };
 }

@@ -28,11 +28,15 @@ benchmark is not "min and max of whatever answered":
 - **Liquidity floor:** venues under **$1M borrowed** are excluded from the headline
   (still shown, marked "below floor"). A $24k book must not move a benchmark
   anchored by ~$450M.
-- **Volume weighting:** the composite is the borrow-balance-weighted mean of the
-  included venues — the same discipline that makes SOFR a volume-weighted statistic
-  rather than a survey.
+- **Volume-weighted MEDIAN:** the composite is the borrow-balance-weighted median of
+  the included venues — the statistic SOFR actually is. Robust by construction: a small
+  venue whose kinked rate model goes vertical in a utilization spike (Moonwell has
+  printed >50% APR on ~$13M) cannot drag a benchmark anchored by ~$450M.
+- **Stress flag:** a venue printing >3× the median is marked *stressed* — it stays in
+  the table and in the median input, but is excluded from the DISPLAY band so one
+  outlier doesn't set the chart scale. Benchmarks trim tails; they don't hide them.
 - **Trailing average (SOFR-average style):** alongside the spot composite, a **90-day
-  trailing composite** — simple mean of daily borrow-weighted composites, built from the
+  trailing composite** — simple mean of daily borrow-weighted medians, built from the
   same standardized schema's *daily snapshots* (time-series, still zero per-protocol
   code). The DeFi analog of the NY Fed's published 30/90/180-day SOFR averages: it
   smooths utilization spikes out of the cross-check. Tenor-matched to the 90d quote.
