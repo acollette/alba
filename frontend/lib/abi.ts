@@ -64,6 +64,24 @@ export const escrowAbi = [
   { type: "function", name: "stateOf", stateMutability: "view", inputs: [{ name: "drawId", type: "bytes32" }], outputs: [{ type: "uint8" }] },
   { type: "function", name: "availableToDraw", stateMutability: "view", inputs: [{ name: "facilityId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "outstandingOf", stateMutability: "view", inputs: [{ name: "facilityId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "repaymentOf", stateMutability: "view", inputs: [{ name: "drawId", type: "bytes32" }], outputs: [{ type: "uint256" }] },
+  {
+    type: "function", name: "cureOrder", stateMutability: "view",
+    inputs: [{ name: "drawId", type: "bytes32" }],
+    outputs: [
+      {
+        name: "order", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "traits", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+      { name: "shipStrategy", type: "bytes" },
+      { name: "tokens", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
+    ],
+  },
   {
     type: "event", name: "FacilityRegistered",
     inputs: [
@@ -185,6 +203,71 @@ export const builderAbi = [
       { name: "tokens", type: "address[]" },
       { name: "amounts", type: "uint256[]" },
     ],
+  },
+  {
+    type: "function", name: "buildMaturityLeg", stateMutability: "pure",
+    inputs: [
+      {
+        name: "t", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "counterToken", type: "address" },
+          { name: "pullToken", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "salt", type: "uint256" },
+        ],
+      },
+      { name: "maturity", type: "uint40" },
+      { name: "executor", type: "address" },
+    ],
+    outputs: [
+      {
+        name: "order", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "traits", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+      { name: "shipStrategy", type: "bytes" },
+      { name: "tokens", type: "address[]" },
+      { name: "amounts", type: "uint256[]" },
+    ],
+  },
+] as const;
+
+export const executorAbi = [
+  {
+    type: "function", name: "registerSettlement", stateMutability: "nonpayable",
+    inputs: [
+      { name: "drawId", type: "bytes32" },
+      {
+        name: "order", type: "tuple",
+        components: [
+          { name: "maker", type: "address" },
+          { name: "traits", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+      },
+      { name: "counterToken", type: "address" },
+      { name: "pullToken", type: "address" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+export const triggerAbi = [
+  {
+    type: "function", name: "scheduleDispatch", stateMutability: "nonpayable",
+    inputs: [
+      { name: "facilityId", type: "uint256" },
+      { name: "drawId", type: "uint256" },
+      { name: "action", type: "string" },
+      { name: "expirySecond", type: "uint256" },
+      { name: "scheduleGasLimit", type: "uint256" },
+      { name: "axelarGasTinybars", type: "uint256" },
+    ],
+    outputs: [{ type: "address" }],
   },
 ] as const;
 

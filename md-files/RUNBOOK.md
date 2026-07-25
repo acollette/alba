@@ -56,8 +56,14 @@ the deal link — "this is the term sheet now; it goes out in Telegram."
 
 **Beat 3 — accept & draw (switch wallet to BORROWER, open the deal link):** the page
 re-renders as the borrower AUTOMATICALLY — no tabs, the wallet IS the role: "the
-contract knows who I am; the deal was sold to one name." Review terms-as-code → **Accept & approve cbBTC** → set 100000 → **Draw**: one
-transaction, collateral in, cash out. Obligations card appears with the health meter.
+contract knows who I am; the deal was sold to one name." Review terms-as-code →
+**Accept & approve cbBTC** → set 100000 → **Draw**: SIX chained prompts — draw (cash
+out, collateral in), authorize repayment pulls, ship CURE leg, ship maturity leg,
+register settlement, then the wallet SWITCHES TO HEDERA TESTNET for one signature
+(the schedule — first time asks to add the network) and switches back. Narrate: "each
+prompt is one leg of the term sheet — and the last one gives the network the
+appointment." Obligations card appears: health meter + ticking term bar. The draw now
+settles ITSELF at maturity — if the term is short (420s), it lands during Q&A.
 
 **Beat 4 — the machine (timeline + explorer tabs):** the run-#9 history already on this
 stack — Hedera schedule `0.0.9751046` "executed by the network" (HashScan), the Axelar

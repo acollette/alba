@@ -7,22 +7,27 @@ import {
   useConnect,
   useDisconnect,
   usePublicClient,
+  useSwitchChain,
   useReadContract,
   useWriteContract,
 } from "wagmi";
 import { formatUnits, parseUnits, toHex } from "viem";
+import { hederaTestnet } from "wagmi/chains";
 import {
   escrowAbi,
   erc20Abi,
   oracleAbi,
   builderAbi,
   aquaAbi,
+  executorAbi,
+  triggerAbi,
   registerFacilityAbi,
 } from "@/lib/abi";
 import {
   ADDR,
   AQUA,
   BUILDER,
+  EXECUTOR,
   CHAIN_ID,
   DEFAULT_FACILITY_ID,
   START_BLOCK,
@@ -805,6 +810,8 @@ function TopUp({ drawId }: { drawId: `0x${string}` }) {
 
 function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty: boolean }) {
   const { isConnected, address } = useAccount();
+  const client = usePublicClient({ chainId: CHAIN_ID });
+  const { switchChainAsync } = useSwitchChain();
   const [amount, setAmount] = useState("25000");
   const [extra, setExtra] = useState("0");
   const { writeContractAsync, isPending } = useWriteContract();
@@ -870,23 +877,82 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
     }
   }
 
+  // Draw = the whole machine arms itself: cash out on Base, repayment pull-rights
+  // shipped, settlement registered, and the HEDERA SCHEDULE created (wallet switches
+  // network for one signature, then switches back). Two chains — so the button chains
+  // the prompts; it cannot be one signature.
   async function onDraw() {
     setError("");
     try {
-      setStatus("drawing — collateral in, cash out, one transaction…");
       // Small ID → renders "#NNNNN" like script-made draws; duplicates revert on-chain
-      const drawId = toHex(BigInt(10_000 + Math.floor(Math.random() * 90_000)), { size: 32 });
+      const drawIdNum = BigInt(10_000 + Math.floor(Math.random() * 90_000));
+      const drawId = toHex(drawIdNum, { size: 32 });
+
+      setStatus("1/6 drawing — collateral in, cash out, one transaction…");
       await writeContractAsync({
-        abi: escrowAbi,
-        address: ADDR.escrow,
-        functionName: "draw",
-        args: [facilityId, drawId, amountUnits, extraUnits],
-        chainId: CHAIN_ID,
+        abi: escrowAbi, address: ADDR.escrow, functionName: "draw",
+        args: [facilityId, drawId, amountUnits, extraUnits], chainId: CHAIN_ID,
       });
-      setStatus(`drawn ✓ drawId ${drawId.slice(0, 10)}…`);
+
+      setStatus("2/6 authorizing repayment pulls (USDC → Aqua, funds stay put)…");
+      const allowance = await client!.readContract({
+        abi: erc20Abi, address: ADDR.usdc, functionName: "allowance", args: [address!, AQUA],
+      });
+      const repayment = await client!.readContract({
+        abi: escrowAbi, address: ADDR.escrow, functionName: "repaymentOf", args: [drawId],
+      });
+      if (allowance < repayment * 4n) {
+        await writeContractAsync({
+          abi: erc20Abi, address: ADDR.usdc, functionName: "approve",
+          args: [AQUA, (1n << 256n) - 1n], chainId: CHAIN_ID,
+        });
+      }
+
+      setStatus("3/6 shipping the CURE leg — your no-penalty liquidation tier…");
+      const cure = await client!.readContract({
+        abi: escrowAbi, address: ADDR.escrow, functionName: "cureOrder", args: [drawId],
+      });
+      await writeContractAsync({
+        abi: aquaAbi, address: AQUA, functionName: "ship",
+        args: [ADDR.router, cure[1], [...cure[2]], [...cure[3]]], chainId: CHAIN_ID,
+      });
+
+      setStatus("4/6 shipping the maturity leg — the repayment, pre-authorized…");
+      const d = await client!.readContract({
+        abi: escrowAbi, address: ADDR.escrow, functionName: "draws", args: [drawId],
+      });
+      const maturity = BigInt(d[7]);
+      const leg = await client!.readContract({
+        abi: builderAbi, address: BUILDER, functionName: "buildMaturityLeg",
+        args: [
+          { maker: address!, counterToken: ADDR.cbbtc, pullToken: ADDR.usdc, amount: repayment, salt: drawIdNum },
+          Number(maturity), EXECUTOR,
+        ],
+      });
+      await writeContractAsync({
+        abi: aquaAbi, address: AQUA, functionName: "ship",
+        args: [ADDR.router, leg[1], [...leg[2]], [...leg[3]]], chainId: CHAIN_ID,
+      });
+
+      setStatus("5/6 registering the settlement with the cross-chain executor…");
+      await writeContractAsync({
+        abi: executorAbi, address: EXECUTOR, functionName: "registerSettlement",
+        args: [drawId, leg[0], ADDR.cbbtc, ADDR.usdc], chainId: CHAIN_ID,
+      });
+
+      setStatus("6/6 switching to Hedera — the network takes the appointment…");
+      await switchChainAsync({ chainId: hederaTestnet.id });
+      await writeContractAsync({
+        abi: triggerAbi, address: HEDERA_TRIGGER, functionName: "scheduleDispatch",
+        args: [BigInt(facilityId), drawIdNum, "SETTLE", maturity + 90n, 2_000_000n, 45_000_000n],
+        chainId: hederaTestnet.id,
+      });
+      await switchChainAsync({ chainId: CHAIN_ID });
+      setStatus(`drawn ✓ ${fmtDrawId(drawId)} — Hedera settles it at maturity, no further action`);
     } catch (e: unknown) {
       setError(String((e as Error).message ?? e).slice(0, 200));
-      setStatus("");
+      setStatus((s) => (s ? s + " — failed here; funds from completed steps are safe" : ""));
+      try { await switchChainAsync({ chainId: CHAIN_ID }); } catch {}
     }
   }
 
@@ -927,9 +993,9 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
         )}
       </div>
       <div className="hint">
-        One transaction: collateral locks in the escrow and the facility&apos;s Aqua order pays out — the escrow is
-        the only doorway (<span className="mono">_onlyTaker</span>), so drawn funds without locked collateral are
-        structurally impossible.
+        Draw arms the whole machine: collateral locks and cash pays out in one tx, then your wallet ships the
+        cure + repayment pull-rights, registers the settlement, and books the HEDERA SCHEDULE (one network
+        switch) — from then on the loan settles itself.
       </div>
       {status && <div className="hint">{status}</div>}
       {error && <div className="err">{error}</div>}

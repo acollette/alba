@@ -11,6 +11,7 @@ export const DEFAULT_FACILITY_ID = (process.env.NEXT_PUBLIC_FACILITY_ID ??
   "0x0000000000000000000000000000000000000000000000000000000000000fac") as `0x${string}`;
 
 export const AQUA = (process.env.NEXT_PUBLIC_AQUA ?? "0x29C10C31eB844D038A0Dc858997f8ADea1da3270") as `0x${string}`;
+export const EXECUTOR = (process.env.NEXT_PUBLIC_EXECUTOR ?? "0x81C35F38B209e7F4A025588cb93be8b51c3897E4") as `0x${string}`;
 export const BUILDER = (process.env.NEXT_PUBLIC_BUILDER ?? "0x99928dACccf994868bC9ba80de0B47c8DA54151B") as `0x${string}`;
 export const CHAIN_ID = 84532; // Base Sepolia — reads pinned here regardless of wallet network
 
