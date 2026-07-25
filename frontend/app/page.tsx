@@ -889,10 +889,14 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
       const drawId = toHex(drawIdNum, { size: 32 });
 
       setStatus("1/6 drawing — collateral in, cash out, one transaction…");
-      await writeContractAsync({
+      // waitForTransactionReceipt after EVERY step: the next step's args are read from
+      // chain state this tx creates — proceeding at broadcast (not mined) makes the
+      // wallet estimate against stale state and flag the next tx "likely to fail"
+      const mined = async (hash: `0x${string}`) => client!.waitForTransactionReceipt({ hash });
+      await mined(await writeContractAsync({
         abi: escrowAbi, address: ADDR.escrow, functionName: "draw",
         args: [facilityId, drawId, amountUnits, extraUnits], chainId: CHAIN_ID,
-      });
+      }));
 
       setStatus("2/6 authorizing repayment pulls (USDC → Aqua, funds stay put)…");
       const allowance = await client!.readContract({
@@ -902,20 +906,20 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
         abi: escrowAbi, address: ADDR.escrow, functionName: "repaymentOf", args: [drawId],
       });
       if (allowance < repayment * 4n) {
-        await writeContractAsync({
+        await mined(await writeContractAsync({
           abi: erc20Abi, address: ADDR.usdc, functionName: "approve",
           args: [AQUA, (1n << 256n) - 1n], chainId: CHAIN_ID,
-        });
+        }));
       }
 
       setStatus("3/6 shipping the CURE leg — your no-penalty liquidation tier…");
       const cure = await client!.readContract({
         abi: escrowAbi, address: ADDR.escrow, functionName: "cureOrder", args: [drawId],
       });
-      await writeContractAsync({
+      await mined(await writeContractAsync({
         abi: aquaAbi, address: AQUA, functionName: "ship",
         args: [ADDR.router, cure[1], [...cure[2]], [...cure[3]]], chainId: CHAIN_ID,
-      });
+      }));
 
       setStatus("4/6 shipping the maturity leg — the repayment, pre-authorized…");
       const d = await client!.readContract({
@@ -929,16 +933,16 @@ function DrawPanel({ facilityId, isParty }: { facilityId: `0x${string}`; isParty
           Number(maturity), EXECUTOR,
         ],
       });
-      await writeContractAsync({
+      await mined(await writeContractAsync({
         abi: aquaAbi, address: AQUA, functionName: "ship",
         args: [ADDR.router, leg[1], [...leg[2]], [...leg[3]]], chainId: CHAIN_ID,
-      });
+      }));
 
       setStatus("5/6 registering the settlement with the cross-chain executor…");
-      await writeContractAsync({
+      await mined(await writeContractAsync({
         abi: executorAbi, address: EXECUTOR, functionName: "registerSettlement",
         args: [drawId, leg[0], ADDR.cbbtc, ADDR.usdc], chainId: CHAIN_ID,
-      });
+      }));
 
       setStatus("6/6 switching to Hedera — the network takes the appointment…");
       await switchChainAsync({ chainId: hederaTestnet.id });
