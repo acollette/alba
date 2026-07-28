@@ -24,4 +24,8 @@ interface ISleeve {
     /// @notice Portion of `totalAssets` withdrawable right now via {withdraw}.
     /// @dev Feeds the vault's maxWithdraw/maxRedeem honesty: never overstate.
     function liquidAssets() external view returns (uint256);
+
+    /// @notice Adapter-type discriminator for UIs/indexers (e.g. "metamorpho",
+    /// "midnight") — replaces probing implementation-specific immutables.
+    function kind() external pure returns (string memory);
 }

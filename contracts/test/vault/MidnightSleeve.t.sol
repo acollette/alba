@@ -59,6 +59,10 @@ contract MidnightSleeveTest is VaultTestBase {
     // ------------------------------------------------------- book & accretion
 
     function test_Buy_RecordsLotAndStaysNavNeutral() public {
+        assertEq(mSleeve.kind(), "midnight");
+        // Bought carries the post-operation book state (face, cost basis).
+        vm.expectEmit(true, false, false, true, address(mSleeve));
+        emit MidnightSleeve.Bought(id, 10_000e6, 9_900e6, 10_000e6, 9_900e6);
         uint256 cost = _buyUnits(10_000e6); // price 0.99
         assertEq(cost, 9_900e6);
         (uint128 units, uint128 costStored,,,,, uint256 rate) = mSleeve.book(id);
@@ -150,6 +154,9 @@ contract MidnightSleeveTest is VaultTestBase {
         usdc.mint(address(mid), 9_000e6);
         mid.fund(id, 9_000e6);
         skip(30 days);
+        // Redeemed reports the post-scale book: full claim zeroes face & cost.
+        vm.expectEmit(true, false, false, true, address(mSleeve));
+        emit MidnightSleeve.Redeemed(id, 9_000e6, 0, 0);
         assertEq(mSleeve.redeem(id), 9_000e6); // slashed face, at par
         (uint128 units,,,,,,) = mSleeve.book(id);
         assertEq(units, 0);
@@ -204,6 +211,9 @@ contract MidnightSleeveTest is VaultTestBase {
     function test_EmergencySell_RealizesPnlAtExecution() public {
         _buyUnits(10_000e6);
         mid.setPrice(0.98e18); // bid side is lower than our 0.99 carry
+        // EmergencySold reports the post-scale remaining book (7k face, 6.93k cost).
+        vm.expectEmit(true, false, false, true, address(mSleeve));
+        emit MidnightSleeve.EmergencySold(id, 3_000e6, 2_940e6, 7_000e6, 6_930e6);
         vm.prank(curator);
         uint256 proceeds = mSleeve.emergencySell(_offer(mkt, true), "", 3_000e6, 2_940e6);
         assertEq(proceeds, 2_940e6);

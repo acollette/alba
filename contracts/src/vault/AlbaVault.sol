@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -22,7 +22,7 @@ import {ISleeve} from "./interfaces/ISleeve.sol";
 ///
 /// Trust model: sleeves are trusted code (see {ISleeve}); the underlying asset
 /// is USDC (no transfer hooks), so no reentrancy guard is used.
-contract AlbaVault is ERC4626, AccessControl, Pausable {
+contract AlbaVault is ERC4626, AccessControlEnumerable, Pausable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -145,12 +145,7 @@ contract AlbaVault is ERC4626, AccessControl, Pausable {
     }
 
     /// @inheritdoc ERC4626
-    function withdraw(uint256 assets, address receiver, address owner)
-        public
-        override
-        whenNotPaused
-        returns (uint256)
-    {
+    function withdraw(uint256 assets, address receiver, address owner) public override whenNotPaused returns (uint256) {
         _accrueFee();
         return super.withdraw(assets, receiver, owner);
     }

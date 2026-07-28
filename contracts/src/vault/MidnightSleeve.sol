@@ -105,9 +105,13 @@ contract MidnightSleeve is ISleeve {
     event MarketCapSet(bytes32 indexed id, uint128 maxUnits);
     event MinYieldSet(uint256 minYieldWad);
     event MaxBuyAssetsSet(uint256 maxBuyAssets);
-    event Bought(bytes32 indexed id, uint256 units, uint256 cost);
-    event Redeemed(bytes32 indexed id, uint256 units);
-    event EmergencySold(bytes32 indexed id, uint256 units, uint256 proceeds);
+    /// @dev Mutation events carry the post-operation book state (bookUnits =
+    /// outstanding face, bookCost = amortized cost basis) AFTER slash re-sync
+    /// and pro-rata scaling, so indexers can track exact lot-level state
+    /// without replaying Midnight's lossFactor math.
+    event Bought(bytes32 indexed id, uint256 units, uint256 cost, uint256 bookUnits, uint256 bookCost);
+    event Redeemed(bytes32 indexed id, uint256 units, uint256 bookUnits, uint256 bookCost);
+    event EmergencySold(bytes32 indexed id, uint256 units, uint256 proceeds, uint256 bookUnits, uint256 bookCost);
 
     // ----------------------------------------------------------------- errors
     error NotVault();
@@ -175,6 +179,11 @@ contract MidnightSleeve is ISleeve {
     }
 
     /// @inheritdoc ISleeve
+    function kind() external pure returns (string memory) {
+        return "midnight";
+    }
+
+    /// @inheritdoc ISleeve
     /// @dev Claimable par (min(effective credit, FCFS pool)) additionally
     /// clamps to carried book value: pulling par pre-maturity realizes the
     /// remaining accretion at execution time, and the view must never report
@@ -229,7 +238,7 @@ contract MidnightSleeve is ISleeve {
         b.cost += uint128(cost);
         b.ratePerSecWad += (units - cost) * WAD / ttm;
         if (b.units > b.maxUnits) revert MarketCapExceeded(b.units, b.maxUnits);
-        emit Bought(id, units, cost);
+        emit Bought(id, units, cost, b.units, b.cost);
     }
 
     /// @notice Pull whatever par is claimable for `id` (up to the market's
@@ -265,7 +274,7 @@ contract MidnightSleeve is ISleeve {
         (, proceeds) = MIDNIGHT.take(offer, ratifierData, units, address(this), address(this), address(0), "");
         if (proceeds < minAssets) revert ProceedsBelowMin(proceeds, minAssets);
         _scale(b, credit - units, credit);
-        emit EmergencySold(id, units, proceeds);
+        emit EmergencySold(id, units, proceeds, b.units, b.cost);
     }
 
     // --------------------------------------------------------------- curation
@@ -364,7 +373,7 @@ contract MidnightSleeve is ISleeve {
         if (claimed == 0) return 0;
         MIDNIGHT.withdraw(m, claimed, address(this), address(this));
         _scale(b, credit - claimed, credit);
-        emit Redeemed(id, claimed);
+        emit Redeemed(id, claimed, b.units, b.cost);
     }
 
     /// @dev Effective credit (credit - pendingFee) as Midnight's own lazy

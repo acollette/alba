@@ -18,6 +18,12 @@ contract AlbaVaultTest is VaultTestBase {
         assertEq(vault.decimals(), 12); // 6 (USDC) + 6 (inflation-guard offset)
         assertEq(vault.name(), "Alba USDC Vault");
         assertEq(vault.symbol(), "albaUSDC");
+
+        // Role holders are enumerable on-chain (no log replay needed by UIs).
+        assertEq(vault.getRoleMemberCount(vault.CURATOR_ROLE()), 1);
+        assertEq(vault.getRoleMember(vault.CURATOR_ROLE(), 0), curator);
+        assertEq(vault.getRoleMemberCount(bytes32(0)), 1); // DEFAULT_ADMIN
+        assertEq(vault.getRoleMember(bytes32(0), 0), admin);
     }
 
     function test_DepositWithdrawRoundTrip() public {

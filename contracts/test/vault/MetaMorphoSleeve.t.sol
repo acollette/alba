@@ -13,6 +13,7 @@ contract MetaMorphoSleeveTest is VaultTestBase {
     }
 
     function test_RoundTrip_ThroughVault() public {
+        assertEq(sleeveA.kind(), "metamorpho");
         _deposit(alice, 50_000e6);
         vm.prank(allocator);
         vault.allocate(address(sleeveA), 50_000e6);

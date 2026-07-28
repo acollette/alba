@@ -66,4 +66,9 @@ contract MetaMorphoSleeve is ISleeve {
     function liquidAssets() external view returns (uint256) {
         return ASSET.balanceOf(address(this)) + TARGET.maxWithdraw(address(this));
     }
+
+    /// @inheritdoc ISleeve
+    function kind() external pure returns (string memory) {
+        return "metamorpho";
+    }
 }
