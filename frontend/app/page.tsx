@@ -258,6 +258,9 @@ function Header() {
       <div className="brand">
         AL<em>BA</em>
         <small>credit desk</small>
+        <small>
+          <a href="/vault">vault →</a>
+        </small>
       </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <span className={`badge ${isConnected ? "ok" : ""}`}>
