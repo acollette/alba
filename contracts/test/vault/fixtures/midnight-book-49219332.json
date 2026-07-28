@@ -1,0 +1,467 @@
+{
+  "comment": "Snapshot of GET https://api.morpho.org/v0/midnight/books/{market_id}/{side}/takeable-offers captured atomically with the pinned fork block. See README.md for regeneration.",
+  "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c",
+  "captured_at_utc": "2026-07-28T~07:20Z",
+  "pinned_block": 49219332,
+  "pinned_block_timestamp": 1785228011,
+  "asks": [
+    {
+      "units": "78316860481",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": false,
+        "maker": "0xd418224ae3c510b645112fd9275ccfd50f996ee4",
+        "max_units": "0",
+        "max_assets": "100000000000",
+        "start": 1785123075,
+        "expiry": 1785232644,
+        "tick": 4516,
+        "group": "0x72e9ceea711ee7a654cff189d8ade0f4fcc0b7117e24e5305f8c4cb8c80d1784",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0xd418224ae3c510b645112fd9275ccfd50f996ee4",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x7a1115ee77f0cadecbb3ab7cfa7a7144ff95088bc778940fbc9520bd22a0dfe400000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000557390d17e360e3a359df3575322d725f80ceeb02ee747a20c621fa1a16f851c0ba8fa3889dcc7fea11cc348407434ea40328b5e872c317ecd8edb15debb3d1ceaa953d6c16a021cec76f362119b68d7765626e0c41e68cece24154fd0f670358205db16948608fa9e9a2253b445e5e2306f044207f5c47cc58fd8a914f37b4c6825e58e6f871a351c22fec122add80185d6f6b5331fe3cd0bbac802b3bb79279",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "93690769410",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": false,
+        "maker": "0x60e67b28f1d80b360a60b17a6deaa8574fe9fe13",
+        "max_units": "0",
+        "max_assets": "93415000000",
+        "start": 1785126320,
+        "expiry": 1785235572,
+        "tick": 4540,
+        "group": "0x6017f1848d93ced5193252c9e8e244b9e75fbe63a0c71baebb667b621f8711d6",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x60e67b28f1d80b360a60b17a6deaa8574fe9fe13",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x10fa5018a0443f560c146c2bbd7f9a5d9f4217fe570f7f121e0f7e1fb85981e4000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000005c7cf65f8fbede641d07c77bd7cf3805d8875bf262aa1015a3bd3dcf781d1223ca9c1cec339927ced8bfd09eb7118c53656b0212137f4b1bfe634a817701c9f092171d3eb842b9b99d7c89031074a207641ca7e87b94e483c9a8a95fef1aea55f136d3a15dc8438184bc123ba67d0472ba0c2b0f4c6ccc22d4ebbd473d2af33a104665b69d3d6d36d78e29f1a262621e479de9fd1c65aa927d2fb900b79a0d339",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "62677314121",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": false,
+        "maker": "0x60e67b28f1d80b360a60b17a6deaa8574fe9fe13",
+        "max_units": "0",
+        "max_assets": "62500000000",
+        "start": 1785223393,
+        "expiry": 1785328706,
+        "tick": 4548,
+        "group": "0xa269ff2a9a33aea1d53ddd74ccaad02b7e29bd769cc98d7c0b7bb0c0b20f4eaf",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x60e67b28f1d80b360a60b17a6deaa8574fe9fe13",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0xb1441d01fd4c1875b33da75005bd5abd091b64f7538a4374461a647d9be3060b0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000057aff2b8bf4aefef753f38a507f44539dad5837feab3860d627ce900b538d34aaba7caa9b6afa07a4630256d7aff643be0052150849b403412cf2317b1824d1a0a5532967a1e3747d7eb608f6c774c144a927f4227bc1bc913d4fba291e1d43a9c138927fc2d729271a236f99f9979dfa0fff69c00dacbf471486aa327d4e54bef7437682ea6d34a540e513071225b6a89ce5d77b637bd60eaceebd34e2c46d05",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    }
+  ],
+  "bids": [
+    {
+      "units": "132753626",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x9b2ce2481ee320ad12aba3c9750904a469f34c78",
+        "max_units": "0",
+        "max_assets": "132304600",
+        "start": 1785228752,
+        "expiry": 1785232352,
+        "tick": 4512,
+        "group": "0xfb141b5436c57210659d77ba77dfb1d0679490c52ff4bcdff46a461787e988d9",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x2439db0370bdcae2d859fa0a24174a464e8a94c370d7264de4014b3afd7f013b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001e1d1e6e6e51775df0c404030ba82cb5fbf40dd332dbe29055aef8cf2b5e33ca3",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "501731123",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x6c515b41bfbee0aa754f306098ba005152c928b9",
+        "max_units": "0",
+        "max_assets": "500000000",
+        "start": 1785191379,
+        "expiry": 1785295054,
+        "tick": 4508,
+        "group": "0x4de9ed4e5a4035a459b5ec264cd4b0534aa3e877ab9ca3ba0d2b193ca17266fb",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x7d1fe9ef787b3f2096ca995cdef620c2a1aefaeea92c1cd1f0f166af4a3b14f800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000531196d72881f65dba3b4312f2871c9602132ce3400335e4640521d2c939b0c6d3d858dfee0d36da67e4d81b58dc38182e83bb42599294a2bba6aba409c54f9021938b0b7c511ebb540141beb3acf850fe1a85eddae4ec7728ab1765582c6aa6d283ebc8cd953fde4f55ccc518c4b84906abb52e459a825afac147eb7bc4ea33db02af3bc5a3c26cc0af63734d658502795139ed41f84974a1f471b02e59d485b",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "96713224",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x2d0ddb2257f3f339dfbef8a0dcf822474ba3f383",
+        "max_units": "0",
+        "max_assets": "105000000",
+        "start": 1785134080,
+        "expiry": 1785243220,
+        "tick": 4508,
+        "group": "0xcc93281f05ce986680b61030ef4fed849e9b2145c9177af391450e194d679215",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x60e89589aeeb594476a620b397cbdd331176e7eeaeef2b699a74f8da87334f30000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000005812eb603cbfbd0b632b9454cbde3262c0825b18ae5ac040c06e4725d6f14248fab0473eb7aa119c5c06a184c6f1433c0a9eb94be78c549d695c75f4708f62ecbb2f749b7f59d8a3d9912dc03b0080e5fb343c8da49ba1047bd17fe35cdafd03d7cd93ddc1662fe1c0379c8185691df380cffb99c5ac295e7a547d81c491d21a34b68702fcc343f59be08f1fd25c1cfb32d4159393549b395f437b3fc36a75638",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "100360313598",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x2ab00b33cbc351b5ce474a80dc4e069e02e68d8e",
+        "max_units": "0",
+        "max_assets": "100000000000",
+        "start": 1785173605,
+        "expiry": 1785281168,
+        "tick": 4500,
+        "group": "0x34d625b5cc820c583ebff6f404a75990561bc4e215eb58db30760079a05da9e1",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0xd6e70365c8e8dda9a4ca662c07bbe663b017755e",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x000000000000000000000000000000000000000000000000000000000000001b3cf4979e952b3e04b7cfa93d1242d2827154275823794282439622977d0d34a06cfd689986ef81d842c8d11710fe805ddab0f0c77212eb255b69fe3ede66068a7762c8974fc89e69ca476c8cc7a4eb668076b437c9dee35a4f06871411395456000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000050c3a94e528dffba7ccf20fe27d4693383ce72b1025305a35f6cb81a5da1c7c8adcd369c7db1c5fa5915dbaf127178e3da3f82d344a1123bd277fdfa9100679bdceef15897b669758d9b7ea74660119e11849284556b6f8765f79ec07ca7a43c9cca690c0923e8e0dd96fcf969e8650b9d245772ce765b6bf26a3a183625ca2ce61ccd926f1cecbf1c2580cf1a68a9398c7f6796b6f5f05565f55ead54844dbab",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "132781312",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x9b2ce2481ee320ad12aba3c9750904a469f34c78",
+        "max_units": "0",
+        "max_assets": "132304600",
+        "start": 1785228759,
+        "expiry": 1785232359,
+        "tick": 4500,
+        "group": "0x93e0980f78fbea48bc7b65dc155e2339832d4f55c5a03083908b7666cc7073cd",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x46805dce9a16596a86fcf86390b3e73c65850293a1f379b8b35171d046270f640000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000012c14c603c4910bf28c8ba94ddab87230407f3fe9b2870cb3eca19d3a3001aaa6",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "101386364",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x4bd047ca72fa05f0b89ad08fe5ba5ccdc07dffbf",
+        "max_units": "0",
+        "max_assets": "101000000",
+        "start": 1785130153,
+        "expiry": 1785239426,
+        "tick": 4488,
+        "group": "0x1086ab4e6e2fbe45761ab2845cae8b732817a15d8d0d2031b094f8c7c6ea6166",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0xdfed1726799da56f5a3a2092b119251771deaafc5333b7a0c1b9a341de49d0a90000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000051316ca8121765fb238b931723876c5b5d68c8f69b44392b4a32f0d3b5118fa90810575a881ff2ba595c39bed497b4d948b1346fdf0d33571c6324ec0a4dac342d54cf8a52a0f7d26adbaf5cb6c7a3933d31a52016a2b1cc595ff3cb9dbc1f3fb933e4b50c14f8c936bc5069d341869a70dead6f69bbe23cfd5621bc480c50e0c29112a3e92b40c5131400716d11cb727aef7cf5ed94bea445dff1ba82cfb5164",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "132810716",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0x9b2ce2481ee320ad12aba3c9750904a469f34c78",
+        "max_units": "0",
+        "max_assets": "132304600",
+        "start": 1785228765,
+        "expiry": 1785232365,
+        "tick": 4488,
+        "group": "0x0e0af64a6fae09cd949c55c701cf053fa8393b7472a14028fb075ca1a5408443",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0xafd48f71035bfbc4e275f068ed914bf11f0cbd039d0d565f45c0c50479b04be5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001578bb0b9c2b7c08c7457074a8459db470ab60d294ba0417747d075849a078e47",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "1004090090",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0xd7a77013933a97a2c08dad7d59937119e76c879a",
+        "max_units": "0",
+        "max_assets": "1000000000",
+        "start": 1785128647,
+        "expiry": 1785237991,
+        "tick": 4468,
+        "group": "0xac01b5eaf57a8ff4eb6e6531bbbc8d9018cbe03af9e088417f18de86d01b3ff7",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0x800b5f12a61b8198a5a6efd794cac6699b294d63",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0xbac9f922248c88f3cf2b4147eed91e2c8d02d3d6fe3d29a701d710285f41764800000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000534d22de66abe435f3480a47481f14fe0d579e78ab268d9dedfb017fe9f319dca58d934fc3e4c59277e44b4bdb4d02fa5ac83b6b292715b705562343a4685110285451880f2f3efbdfb664c113dab27a07050d664398905857d992c769a9b965d638b084c942b8bd6073eefd1b32ae725d30be08a4ffc1d485799926de3026c72335e79390d54c6e4c69b01813d02432c420abb828a4436f20dee2b5c21e614c2",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    },
+    {
+      "units": "1205174175",
+      "offer": {
+        "market": {
+          "chain_id": 8453,
+          "midnight": "0xadedd8ab6de832766fedf0fac4992e5c4d3ea18a",
+          "loan_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "collaterals": [
+            {
+              "token": "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+              "lltv": "860000000000000000",
+              "liquidation_cursor": "300000000000000000",
+              "oracle": "0x663becd10dae6c4a3dcd89f1d76c1174199639b9"
+            }
+          ],
+          "maturity": 1787929200,
+          "rcf_threshold": "3000000000",
+          "enter_gate": "0x0000000000000000000000000000000000000000",
+          "liquidator_gate": "0x0000000000000000000000000000000000000000"
+        },
+        "buy": true,
+        "maker": "0xbde28a4c262dfe3ea37794421e32b7bb5a113949",
+        "max_units": "0",
+        "max_assets": "1200000000",
+        "start": 1785150782,
+        "expiry": 1785259209,
+        "tick": 4464,
+        "group": "0x46f52f1a1f2321b11f51eda59767571d7f328d05229bfd165b956beb7d52cf18",
+        "callback": "0x0000000000000000000000000000000000000000",
+        "callback_data": "0x",
+        "receiver_if_maker_is_seller": "0x0000000000000000000000000000000000000000",
+        "ratifier": "0xd6e70365c8e8dda9a4ca662c07bbe663b017755e",
+        "reduce_only": false,
+        "continuous_fee_cap": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "ratifier_data": "0x000000000000000000000000000000000000000000000000000000000000001bf1e7538bf748bf5cfd85ca9b273aea773afcb2cfc5b01b292931cef8f748407b777391d7cba1abeaac0e3baf5ab020e56f8c2736a4dfa88b2652dc6ca627e149cdeaaca10ebc3ded917084bb038265d9ca878a52e34e03b01d5065f9b019c53d000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000053b38cccc38911f026e6a8d51afb6307483dd0f97bd53e1e61d115b68a0072419c37cd6360c512858537e227b8f624f525e66cefd0d2a34d8075bf2f9fc08eee22ba45798d3e2925e4c4a113a563ae77c56fb187cdc90153b5f55449c8fc674048643d485a6e150ab77c57a86bdbd8fa7009b2810bd1c3b47916b2a9766ce254585360ae8b57bf7152fbe00dc961e2b156c0f854c0a5df5d348b18bc1901211d9",
+      "market_id": "0x05959752fdeff325962b9d263edb421efc6e2186a49360dba6c32e86ebf6c84c"
+    }
+  ]
+}

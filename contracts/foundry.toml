@@ -6,8 +6,13 @@ solc_version = "0.8.30"
 optimizer = true
 optimizer_runs = 700
 via_ir = true
-# swap-vm's TransientLock needs cancun; Hedera testnet supports shanghai+ (spike contracts unaffected)
-evm_version = "cancun"
+# osaka: the deployed Midnight core (Base, 0xAdedD8ab…18A) uses the Osaka `clz`
+# opcode — fork tests executing its bytecode need the osaka runtime spec, which
+# requires forge >= 1.5.x (1.0.0 rejects "osaka" / halts with OpcodeNotFound).
+# solc 0.8.30 normalizes the codegen target down (prague), so compiled artifacts
+# are unchanged; swap-vm's TransientLock (cancun) and the Hedera spike contracts
+# (shanghai+) are unaffected.
+evm_version = "osaka"
 remappings = [
     "axelar-gmp-sdk-solidity/=lib/axelar-gmp-sdk-solidity/",
     "forge-std/=lib/forge-std/src/",
