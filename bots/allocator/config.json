@@ -1,0 +1,48 @@
+{
+  "_comment": "Alba allocator strategy config — WS5 DRY-RUN. Every knob is documented in README.md (Config reference). '_'-prefixed keys are inline docs (ignored by the bot). Amounts are whole USDC.",
+
+  "_simulatedAumUSDC": "Paper-trading AUM seeded into state.json on first run (or --reset). Dry-run only; live mode reads vault state on-chain.",
+  "simulatedAumUSDC": 100000,
+
+  "_buckets": "Maturity ladder targets, % of NAV. Sum of targetWeightPct + bufferTargetPct should be 100. Paper beyond the last bucket's maxDays is ineligible.",
+  "buckets": [
+    { "name": "0-14d",  "minDays": 0,  "maxDays": 14, "targetWeightPct": 20 },
+    { "name": "15-45d", "minDays": 15, "maxDays": 45, "targetWeightPct": 35 },
+    { "name": "46-90d", "minDays": 46, "maxDays": 90, "targetWeightPct": 25 }
+  ],
+
+  "_bufferTargetPct": "MetaMorpho floating buffer target, % of NAV (PRODUCT.md v1: ~20% liquid buffer). Rebalanced toward this after buys each run.",
+  "bufferTargetPct": 20,
+  "_bufferTolerancePct": "No rebalance while |buffer - target| is within this % of NAV (avoids churn).",
+  "bufferTolerancePct": 3,
+
+  "_minSpreadBps": "Minimum spread of a bond's executable yield OVER the floating benchmark before a standing borrower offer is worth taking. The core 'is fixed paying us for term?' test.",
+  "minSpreadBps": 75,
+
+  "_perMaturityMaxPctOfAum": "Concentration cap: max % of NAV in any single maturity date.",
+  "perMaturityMaxPctOfAum": 10,
+  "_perMaturityMaxPctOfBookDepth": "Depth cap: never take more than this % of a book's visible executable (ask-side) depth in one run — we must not BE the market.",
+  "perMaturityMaxPctOfBookDepth": 25,
+
+  "_maxSingleBuyUSDC": "Max cash spent on a single buy decision (one market, one run).",
+  "maxSingleBuyUSDC": 10000,
+  "_minClipUSDC": "Dust floor for a buy: if the sized clip comes out below this, skip (mirrors rates MIN_DEPTH_USDC = $5k).",
+  "minClipUSDC": 5000,
+  "_minBookDepthUSDC": "A market's ask side must have at least this much live, unexpired depth to be considered at all ($5k dust floor).",
+  "minBookDepthUSDC": 5000,
+
+  "_minDaysToMaturity": "Skip paper maturing sooner than this (not worth the gas/ops).",
+  "minDaysToMaturity": 2,
+  "_maxDaysToMaturity": "Skip paper maturing later than this (ladder horizon).",
+  "maxDaysToMaturity": 90,
+
+  "_fallbackFloatingAprPct": "Floating benchmark used when GRAPH_API_KEY is unset (dry-run without secrets). Sanity-check against the rates dashboard (borrow-weighted median of Base USDC venues).",
+  "fallbackFloatingAprPct": 4.0,
+  "_fallbackBufferSupplyAprPct": "Simulated MetaMorpho buffer supply APR when GRAPH_API_KEY is unset (accrues the paper buffer between runs).",
+  "fallbackBufferSupplyAprPct": 3.6,
+
+  "_staleLockMinutes": "A .lock older than this is considered stale and stolen (crash recovery for cron).",
+  "staleLockMinutes": 10,
+  "_maxMarketPages": "Max pages to walk on the Midnight /markets endpoint (100 markets/page, sorted by size desc).",
+  "maxMarketPages": 5
+}

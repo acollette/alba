@@ -1,0 +1,4 @@
+# generated at runtime — the simulated book and its audit trail
+state.json
+decisions.jsonl
+*.lock
